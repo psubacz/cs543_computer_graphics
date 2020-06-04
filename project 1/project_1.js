@@ -10,59 +10,101 @@ function init(){
 	//display the file upload button
 	document.getElementById('image-file').style.display = 'block';
 	//display the current mode the user is in.
-	document.getElementById("pageMode").innerHTML = 'File Mode';
+	document.getElementById('pageMode').innerHTML = 'File Mode';
+	//display the default color being displayed mode 
+	document.getElementById('colorMode').innerHTML = 'Color: Black'
 }
 
-function parse_file(image)
+function draw_mode()
 {
-	console.log('Ingesting...');
-	console.log(image.Size);
+	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
+	document.getElementById('image-file').style.display = 'none';	//Display the button
 }
 
-async function uploadImage() 
+function file_mode()
+{
+	document.getElementById("pageMode").innerHTML = 'File Mode';	//Display the mode
+	document.getElementById('image-file').style.display = 'block';	//Display the button
+}
+
+function change_color(colorIndex,colorList)
+{
+	if (colorIndex >= colorList.length)
+	{
+		colorIndex = 0;
+	}
+	document.getElementById("colorMode").innerHTML = colorList[colorIndex];
+	console.log(colorIndex);
+	colorIndex++;
+	return colorIndex;
+}
+
+async function upload_image() 
 {
 	// Async ingest and parse a 
+	// logic src: https://www.w3schools.com/jsref/prop_fileupload_files.asp
 	var x = document.getElementById("image-file");
 	var outputMessage = "";
 	if ('files' in x) {
 		if (x.files.length == 0) {
 		  outputMessage = "Select one or more files.";
 		} else {
-		  for (var i = 0; i < x.files.length; i++) {
-			outputMessage += "<br><strong>" + (i+1) + ". file</strong><br>";
-			var file = x.files[i];
-			if ('name' in file) {
-			  outputMessage += "name: " + file.name + "<br>";
+		  	for (var i = 0; i < x.files.length; i++) {
+				// for file in files
+				outputMessage += "<br><strong>" + (i+1) + ". file</strong><br>"; //display file index (if multiple files)
+				var file = x.files[i];
+				if ('name' in file) {
+				  outputMessage += "name: " + file.name + "<br>";
 			}
 			if ('size' in file) {
 			  outputMessage += "size: " + file.size + " bytes <br>";
 			}
-		}}} 
+		}
+	}
+	} 
 	  else {
 		if (x.value == "") {
-		  outputMessage += "Select one or more files.";
+		//   outputMessage += "Select one or more files.";
 		} else {
-		  outputMessage += "The files property is not supported by your browser!";
-		  outputMessage  += "<br>The path of the selected file: " + x.value; // If the browser does not support the files property, it will return the path of the selected file instead. 
+		//   outputMessage += "The files property is not supported by your browser!";
+		//   outputMessage  += "<br>The path of the selected file: " + x.value; // If the browser does not support the files property, it will return the path of the selected file instead. 
 		}}
 
+	//display output to message
 	document.getElementById("fileContent").innerHTML = outputMessage; 
+	// console.log(outputMessage);
 }
 
 function main() 
 {
-	let photo = document.getElementById("image-file").files[0];
-	let formData = new FormData();
+	var colorList = ["Color: Black",
+		"Color: Red", 
+		"Color: Green",
+		"Color: Blue"];
 
+	var colorIndex = 0;
+	   
 	// Initialize the document mode and settings
 	init();
+
+	// Add the event listener to parse input file
+	document.getElementById('image-file').addEventListener('change', function() { 
+              
+		var fr=new FileReader(); 
+		fr.onload=function(){ 
+			// document.getElementById('output').textContent=fr.result;
+			console.log(fr.result);
+		} 
+		fr.readAsText(this.files[0]); 
+	}) 
+
 
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');
 
 	// Get the rendering context for WebGL
 	var gl = WebGLUtils.setupWebGL(canvas);
-	if (!gl) 
+	if (!gl)
 	{
 		console.log('Failed to get the rendering context for WebGL');
 		return;
@@ -174,15 +216,17 @@ function main()
 
 		case 'f':
 			//file mode
-			document.getElementById("pageMode").innerHTML = 'File Mode';	//Display the mode
-			document.getElementById('image-file').style.display = 'block';	//Display the button
-			
+			file_mode()
 			break;
+
 		case 'd':
 			//draw mode
-			document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
-			document.getElementById('image-file').style.display = 'none';	//Display the button
+			draw_mode()
 			break;
+
+		case 'c':
+			//changes color by indexing +1
+			colorIndex = change_color(colorIndex,colorList);
 		}
 	}
 }

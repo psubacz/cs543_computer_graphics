@@ -2,10 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>WebGL Example File</title>
- 
-	<script id="vshader" type="x-shader/x-vertex">
+	<title>Subacz Project 1</title>
 	
+	<script id="vshader" type="x-shader/x-vertex">
 	attribute vec4 vPosition;	
 	attribute vec4 vColor;
 	uniform float vPointSize;
@@ -29,8 +28,7 @@
     <script src="lib/webgl-utils.js"></script>
     <script src="lib/initShaders.js"></script>
     <script src="lib/MV.js"></script>
-    
-    <script src="example.js"></script>
+	<script src="project_1.js"></script>
 
   </head>
  
@@ -38,7 +36,13 @@
   
     <canvas id="webgl" width="400" height="400">
     	Please use a browser that supports the "canvas" tag.
-    </canvas>
+	</canvas>
+
+	<p id="userMode"></p>
+
+	<p id="pageMode"></p>
+
+	<input id="image-file" type="file" />
 
   </body>
 </html>

@@ -4,8 +4,20 @@
  * 
  * @author Joshua Cuneo
  */
+
+
+function init(){
+	//display the file upload button
+	document.getElementById('image-file').style.display = 'block';
+	//display the current mode the user is in.
+	document.getElementById("pageMode").innerHTML = 'File Mode';
+}
+
 function main() 
 {
+	// Initialize the document mode and settings
+	init();
+
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');
 
@@ -120,12 +132,23 @@ function main()
 			gl.drawArrays(gl.TRIANGLES, 0, points.length);
 			//window.alert('Key pressed is ' + key);
 			break;
+
+		case 'f':
+			//file mode
+			document.getElementById("pageMode").innerHTML = 'File Mode';
+			document.getElementById('image-file').style.display = 'block';
+			
+			let photo = document.getElementById("image-file").files[0];
+			let formData = new FormData();
+
+			formData.append("photo", photo);
+			fetch('/upload/image', {method: "POST", body: formData});
+			break;
+		case 'd':
+			//draw mode
+			document.getElementById("pageMode").innerHTML = 'Draw Mode';
+			document.getElementById('image-file').style.display = 'none';
+			break;
 		}
 	}
-
-	window.onclick = function(event)
-	{
-		gl.clear(gl.COLOR_BUFFER_BIT);
-	}
-
 }

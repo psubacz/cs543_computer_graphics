@@ -13,8 +13,47 @@ function init(){
 	document.getElementById("pageMode").innerHTML = 'File Mode';
 }
 
+function parse_file(image)
+{
+	console.log('Ingesting...');
+	console.log(image.Size);
+}
+
+async function uploadImage() 
+{
+	// Async ingest and parse a 
+	var x = document.getElementById("image-file");
+	var outputMessage = "";
+	if ('files' in x) {
+		if (x.files.length == 0) {
+		  outputMessage = "Select one or more files.";
+		} else {
+		  for (var i = 0; i < x.files.length; i++) {
+			outputMessage += "<br><strong>" + (i+1) + ". file</strong><br>";
+			var file = x.files[i];
+			if ('name' in file) {
+			  outputMessage += "name: " + file.name + "<br>";
+			}
+			if ('size' in file) {
+			  outputMessage += "size: " + file.size + " bytes <br>";
+			}
+		}}} 
+	  else {
+		if (x.value == "") {
+		  outputMessage += "Select one or more files.";
+		} else {
+		  outputMessage += "The files property is not supported by your browser!";
+		  outputMessage  += "<br>The path of the selected file: " + x.value; // If the browser does not support the files property, it will return the path of the selected file instead. 
+		}}
+
+	document.getElementById("fileContent").innerHTML = outputMessage; 
+}
+
 function main() 
 {
+	let photo = document.getElementById("image-file").files[0];
+	let formData = new FormData();
+
 	// Initialize the document mode and settings
 	init();
 
@@ -135,19 +174,14 @@ function main()
 
 		case 'f':
 			//file mode
-			document.getElementById("pageMode").innerHTML = 'File Mode';
-			document.getElementById('image-file').style.display = 'block';
+			document.getElementById("pageMode").innerHTML = 'File Mode';	//Display the mode
+			document.getElementById('image-file').style.display = 'block';	//Display the button
 			
-			let photo = document.getElementById("image-file").files[0];
-			let formData = new FormData();
-
-			formData.append("photo", photo);
-			fetch('/upload/image', {method: "POST", body: formData});
 			break;
 		case 'd':
 			//draw mode
-			document.getElementById("pageMode").innerHTML = 'Draw Mode';
-			document.getElementById('image-file').style.display = 'none';
+			document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
+			document.getElementById('image-file').style.display = 'none';	//Display the button
 			break;
 		}
 	}

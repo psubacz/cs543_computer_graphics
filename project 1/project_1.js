@@ -61,16 +61,27 @@ function parse_text_file(rawText){
 	return polygons;
 }
 
-function draw_mode()
+async function draw_mode()
 {
 	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
 	document.getElementById('image-file').style.display = 'none';	//Display the button
+	// await ;
 }
 
-function file_mode()
+// async function asyncCall() {
+// 	console.log('calling');
+// 	const result = await resolveAfter2Seconds();
+// 	console.log(result);
+// 	// expected output: 'resolved'
+//   }
+
+ function file_mode(gl,polygonsList = null)
 {
 	document.getElementById("pageMode").innerHTML = 'File Mode';	//Display the mode
 	document.getElementById('image-file').style.display = 'block';	//Display the button
+	// 
+	var vBuffer = gl.createBuffer();
+	
 }
 
 function change_color(colorIndex,colorList)
@@ -127,19 +138,21 @@ function main()
 		"Color: Red", 
 		"Color: Green",
 		"Color: Blue"];
-
 	var colorIndex = 0;
 	   
 	// Initialize the document mode and settings
 	init();
 
 	var polygonsList = [];
+	var polygonsReady = false;
 	// Add the event listener to parse input file
 	document.getElementById('image-file').addEventListener('change', function() {
 		var fr = new FileReader();
 		fr.onload= function (e){
 			polygonsList = parse_text_file(fr.result);
 			console.log('Jobs Done')
+			// var polygonsReady = true;
+			file_mode(polygonsList)
 		}
 		fr.readAsText(this.files[0]);
 	}) 
@@ -261,7 +274,7 @@ function main()
 
 		case 'f':
 			//file mode
-			file_mode()
+			file_mode(gl)
 			break;
 
 		case 'd':
@@ -274,4 +287,5 @@ function main()
 			colorIndex = change_color(colorIndex,colorList);
 		}
 	}
+	file_mode(gl);
 }

@@ -33,19 +33,16 @@
   </head>
  
   <body onload="main()">
-  
+	<p id="colorMode"></p>
+	<p id="pageMode"></p>
     <canvas id="webgl" width="400" height="400">
     	Please use a browser that supports the "canvas" tag.
 	</canvas>
 
-	<p id="userMode"></p>
-
-	<p id="pageMode"></p>
-
 	<p id="fileContent"></p>
 
 	<!--  -->
-	<input id="image-file" type="file" onchange="uploadImage()" >
+	<input id="image-file" type="file" onchange="upload_image()" accept=".dat">
 
   </body>
 </html>

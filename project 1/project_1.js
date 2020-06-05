@@ -3,6 +3,7 @@
  * by Matsuda and Lea, 1st edition.
  * 
  * @author Joshua Cuneo
+ * @author Peter Subacz
  */
 
 
@@ -13,6 +14,51 @@ function init(){
 	document.getElementById('pageMode').innerHTML = 'File Mode';
 	//display the default color being displayed mode 
 	document.getElementById('colorMode').innerHTML = 'Color: Black'
+}
+
+
+function parse_text_file(rawText){
+	/*
+		quick and dirty parser used to get polygons from text file
+		make a list of new points
+
+		returns list
+	*/
+	var polygons = [];
+	var polygonsIndex = 0;
+	var polygon = [];
+	var polygonIndex = 0;
+	var lines = rawText.split(/\r?\n/g);
+	var floatCast = 0.0;
+	var index = 0;
+
+	for(i=0;i<lines.length;i++){
+		var point = vec4(0.0, 0.0, 0.0, 1.0);
+		var lineArray = lines[i].split(/(\s+)/);
+		for(ii=0;ii<lineArray.length;ii++){
+			if (lineArray[ii].length>2){
+				floatCast = parseFloat(lineArray[ii])
+				if (!isNaN(floatCast))
+				{
+					point[index] = floatCast
+					index++
+				}
+			}
+		}
+		if (index>0){
+			polygon[polygonIndex] = point;
+			polygonIndex++;
+			index = 0;
+		}else{
+			if (polygon.length>0){
+				polygons[polygonsIndex] = polygon
+				polygon=[];
+				polygonsIndex++;
+				polygonIndex = 0;
+			}
+		}
+	}
+	return polygons;
 }
 
 function draw_mode()
@@ -87,17 +133,16 @@ function main()
 	// Initialize the document mode and settings
 	init();
 
+	var polygonsList = [];
 	// Add the event listener to parse input file
-	document.getElementById('image-file').addEventListener('change', function() { 
-              
-		var fr=new FileReader(); 
-		fr.onload=function(){ 
-			// document.getElementById('output').textContent=fr.result;
-			console.log(fr.result);
-		} 
-		fr.readAsText(this.files[0]); 
+	document.getElementById('image-file').addEventListener('change', function() {
+		var fr = new FileReader();
+		fr.onload= function (e){
+			polygonsList = parse_text_file(fr.result);
+			console.log('Jobs Done')
+		}
+		fr.readAsText(this.files[0]);
 	}) 
-
 
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');
@@ -211,7 +256,7 @@ function main()
 			//https://stackoverflow.com/questions/35493509/webgl-draw-in-event-handler-seems-to-clear-the-canvas
 			//https://stackoverflow.com/questions/9843492/webgl-drawing-failure-after-mouse-click
 			gl.drawArrays(gl.TRIANGLES, 0, points.length);
-			//window.alert('Key pressed is ' + key);
+			// window.alert('Key pressed is ' + key);
 			break;
 
 		case 'f':

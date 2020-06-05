@@ -69,7 +69,6 @@ async function draw_mode()
  function file_mode(gl,polygonList)
 {
 	if (polygonList == null){
-		document.getElementById("fileContent").innerHTML = 'Upload a file to draw.';
 
 	}else{
 		// Set clear color
@@ -77,34 +76,34 @@ async function draw_mode()
 		// Clear <canvas> by clearing the color buffer
 		gl.clear(gl.COLOR_BUFFER_BIT);
 		console.log(polygonList.size)
-		for(i=1;i<polygonList.length;i++){
-			var vBuffer = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, flatten(polygonList[i]), gl.STATIC_DRAW);
+	for(i=1;i<polygonList.length;i++){
+		var vBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygonList[i]), gl.STATIC_DRAW);
 
-			var vPosition = gl.getAttribLocation(program, "vPosition");
-			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-			gl.enableVertexAttribArray(vPosition);
+		var vPosition = gl.getAttribLocation(program, "vPosition");
+		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(vPosition);
 
-			var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-			gl.uniform1f(offsetLoc, 1.0);
+		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
+		gl.uniform1f(offsetLoc, 1.0);
 
-			/*** COLOR DATA ***/
-			var colors = [];
-			for(ii=1;ii<polygonList[i].length+1;ii++){
-				colors.push(vec4(0.0, 0.0, 0.0, 1.0));
-			}
+		/*** COLOR DATA ***/
+		var colors = [];
+		for(ii=1;ii<polygonList[i].length+1;ii++){
+			colors.push(vec4(0.0, 0.0, 0.0, 1.0));
+		}
 
-			var cBuffer = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+		var cBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
 
-			var vColor = gl.getAttribLocation(program, "vColor");
-			gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-			gl.enableVertexAttribArray(vColor);
-			
-			// Draw a point
-			gl.drawArrays(gl.LINES, 0, polygonList[i].length);
+		var vColor = gl.getAttribLocation(program, "vColor");
+		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(vColor);
+		
+		// Draw a point
+		gl.drawArrays(gl.LINES_STRIP, 0, polygonList[i].length);
 		}
 	}
 }
@@ -196,6 +195,9 @@ function main()
 	// This function call will create a shader, upload the GLSL source, and compile the shader
 	program = initShaders(gl, "vshader", "fshader");
 
+	//start off in filemode
+
+	file_mode(gl,null);
 	// We tell WebGL which shader program to execute.
 	gl.useProgram(program);
 
@@ -206,9 +208,6 @@ function main()
 	//canvas is the window, and viewport is the viewing area within that window
 		//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
 	gl.viewport( 0, 0, canvas.width, canvas.height );
-
-	//start off in filemode
-	file_mode(gl,null);
 
 	window.onkeypress = function(event)
 	{

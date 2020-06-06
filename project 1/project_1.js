@@ -6,15 +6,6 @@
  * @author Peter Subacz
  */
 
-function init(){
-	//display the file upload button
-	document.getElementById('image-file').style.display = 'block';
-	//display the current mode the user is in.
-	document.getElementById('pageMode').innerHTML = 'File Mode';
-	//display the default color being displayed mode 
-	document.getElementById('colorMode').innerHTML = 'Color: Black'
-}
-
 function parse_text_file(rawText){
 	/*
 		quick and dirty parser used to get 2D vector points. the parser goes
@@ -81,68 +72,80 @@ function parse_text_file(rawText){
 	return [vectors,dataType];
 }
 
-async function draw_mode()
+function draw_mode()
 {
 	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
 	document.getElementById('image-file').style.display = 'none';	//Display the button
 	// await ;
 }
 
- function file_mode(gl,vectorList,vectorType)
-{
-	if (vectorList == null){
-	}else{
+function reset_canvas(gl){
 		// Set clear color
 		gl.clearColor(1.0, 1.0, 1.0, 1.0);
 		// Clear <canvas> by clearing the color buffer
 		gl.clear(gl.COLOR_BUFFER_BIT);
+}
 
+function set_colors(gl,vectorList,colorIndex){
+	/*** COLOR DATA ***/
+	var colors = [];
+	for(ii=1;ii<vectorList.length+1;ii++){
+		switch (colorIndex){
+			case 0:
+				colors.push(vec4(0.0, 0.0, 0.0, 1.0));
+				break;
+			case 1:
+				colors.push(vec4(1.0, 0.0, 0.0, 1.0));
+				break;
+			case 2:
+				colors.push(vec4(0.0, 1.0, 0.0, 1.0));
+				break;
+   			case 3:
+				colors.push(vec4(0.0, 0.0, 1.0, 1.0));
+				break;
+		default:
+			colors.push(vec4(0.0, 0.0, 0.0, 1.0));
+		}
+	}
 
+	var cBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
 
+	var vColor = gl.getAttribLocation(program, "vColor");
+	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vColor);
+}
 
-		
+function set_vector_points(gl,vectorList,vectorType){
+	var vBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(vectorList), gl.STATIC_DRAW);
+
+	var vPosition = gl.getAttribLocation(program, "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);
+}
+
+function file_mode(gl,vectorList,vectorType,colorIndex){
+	if (vectorList == null){
+	}else{
+		reset_canvas(gl);
 		// start at the 2nd index becuase 0 = canvas
 		for(i=1;i<vectorList.length;i++){
-			var vBuffer = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, flatten(vectorList[i]), gl.STATIC_DRAW);
-
-			var vPosition = gl.getAttribLocation(program, "vPosition");
-			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-			gl.enableVertexAttribArray(vPosition);
 
 			var offsetLoc = gl.getUniformLocation(program, "vPointSize");
 			gl.uniform1f(offsetLoc, 1.0);
 
-			/*** COLOR DATA ***/
-			var colors = [];
-			for(ii=1;ii<vectorList[i].length+1;ii++){
-				colors.push(vec4(0.0, 0.0, 0.0, 1.0));
-			}
+			//set the vectors to be drawn
+			set_vector_points(gl,vectorList[i],vectorType);
 
-			var cBuffer = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-
-			var vColor = gl.getAttribLocation(program, "vColor");
-			gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-			gl.enableVertexAttribArray(vColor);
+			//set the colors to be painted
+			set_colors(gl,vectorList[i],colorIndex);
 			
 			// Draw a point
 			gl.drawArrays(gl.LINES_STRIP, 0, vectorList[i].length);
 		}}}
-
-function change_color(colorIndex,colorList)
-{
-	if (colorIndex >= colorList.length)
-	{
-		colorIndex = 0;
-	}
-	document.getElementById("colorMode").innerHTML = colorList[colorIndex];
-	console.log(colorIndex);
-	colorIndex++;
-	return colorIndex;
-}
 
 async function upload_image() 
 {
@@ -182,16 +185,24 @@ async function upload_image()
 
 function main() 
 {
-	var colorList = ["Color: Black",
-		"Color: Red", 
-		"Color: Green",
-		"Color: Blue"];
 	var colorIndex = 0;
-	   
-	// Initialize the document mode and settings
-	init();
-
+	var colorList = ["Color: Black", "Color: Red", "Color: Green", "Color: Blue"];
+	var currentColor = colorList[colorIndex];
 	var vectorsList = [];
+
+	// Retrieve <canvas> element
+	var canvas = document.getElementById('webgl');
+
+	// Get the rendering context for WebGL
+	var gl = WebGLUtils.setupWebGL(canvas);
+
+	// Initialize the document mode and settings
+	//display the file upload button
+	document.getElementById('image-file').style.display = 'block';
+	//display the current mode the user is in.
+	document.getElementById('pageMode').innerHTML = 'File Mode';
+	//display the default color being displayed mode 
+	document.getElementById('colorMode').innerHTML = currentColor
 	// Add the event listener to parse input file
 	document.getElementById('image-file').addEventListener('change', function() {
 		var fr = new FileReader();
@@ -199,16 +210,12 @@ function main()
 			vectorsList = parse_text_file(fr.result);
 			console.log('Jobs Done')
 			// var vectorsReady = true;
-			file_mode(gl,vectorsList[0],vectorsList[1])
+			file_mode(gl,vectorsList[0],vectorsList[1],colorIndex)
 		}
 		fr.readAsText(this.files[0]);
 	}) 
 
-	// Retrieve <canvas> element
-	var canvas = document.getElementById('webgl');
 
-	// Get the rendering context for WebGL
-	var gl = WebGLUtils.setupWebGL(canvas);
 	if (!gl)
 	{
 		console.log('Failed to get the rendering context for WebGL');
@@ -219,9 +226,6 @@ function main()
 	// This function call will create a shader, upload the GLSL source, and compile the shader
 	program = initShaders(gl, "vshader", "fshader");
 
-	//start off in filemode
-
-	file_mode(gl,null);
 	// We tell WebGL which shader program to execute.
 	gl.useProgram(program);
 
@@ -231,7 +235,10 @@ function main()
 	//width, height - specify the width and height of the viewport (in pixels)
 	//canvas is the window, and viewport is the viewing area within that window
 		//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
-	gl.viewport( 0, 0, canvas.width, canvas.height );
+	gl.viewport( 0, 0, canvas.width, canvas.height);
+
+	//start off in filemode
+	file_mode(gl,null,null,null,null);
 
 	window.onkeypress = function(event)
 	{
@@ -261,7 +268,13 @@ function main()
 
 		case 'c':
 			//changes color by indexing +1
-			colorIndex = change_color(colorIndex,colorList);
+			colorIndex++;
+			if (colorIndex >= colorList.length)
+			{
+				colorIndex = 0;
+			}
+			document.getElementById("colorMode").innerHTML = colorList[colorIndex];
+			file_mode(gl,vectorsList[0],vectorsList[1],colorIndex)
 		}
 	}
 }

@@ -154,8 +154,8 @@ function set_viewports(gl,extents)
 
 function sum_(vector){
 	var vectorSum =0.0;
-	for(i=0; i<vector[0].length;i++){
-		vectorSum = vectorSum+vector[0][i];
+	for(i=0; i<vector.length;i++){
+		vectorSum = vectorSum+vector[i];
 	}
 	return vectorSum;
 }
@@ -164,7 +164,8 @@ function file_mode(gl,vectorList,vectorType,colorIndex){
 	if (vectorList == null){
 		document.getElementById('pageMode').innerHTML = 'File Mode';
 	}else{
-		vectorSum = sum_(vectorList[0]);
+		var extent = vectorList[0][0]
+		vectorSum = sum_(extent);
 		if (vectorSum>0.0 || vectorSum<0.0){
 			set_viewports(gl,vectorList[0]);
 		}

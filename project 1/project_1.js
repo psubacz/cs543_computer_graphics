@@ -88,7 +88,6 @@ function set_viewports(gl,extents)
 	}		 
 	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
 	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
-	// gl.viewport( 0, 0, canvas.width, canvas.height);
 }
 
 function sum_(vector){
@@ -112,6 +111,18 @@ function parse_text_file(rawText){
 
 		returns list
 	*/
+	var uploadedFile = document.getElementById("image-file");
+	var outputMessage = "";
+	var file = uploadedFile.files[0];
+	if ('name' in file) {
+		outputMessage += "name: " + file.name + "<br>";
+	}
+	if ('size' in file) {
+		outputMessage += "size: " + file.size + " bytes <br>";
+	}
+	//display output to message
+	document.getElementById("fileContent").innerHTML = outputMessage; 
+
 	var extent = null
 	var dataType = '';			// data inside file, can be float of int
 	var vectors = [];			// list to hold vectors
@@ -190,42 +201,6 @@ function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 			// Draw a point
 			gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length);
 		}}}
-
-async function upload_image() 
-{
-	// Async ingest and parse a 
-	// logic src: https://www.w3schools.com/jsref/prop_fileupload_files.asp
-	var x = document.getElementById("image-file");
-	var outputMessage = "";
-	if ('files' in x) {
-		if (x.files.length == 0) {
-		  outputMessage = "Select one or more files.";
-		} else {
-		  	for (var i = 0; i < x.files.length; i++) {
-				// for file in files
-				outputMessage += "<br><strong>" + (i+1) + ". file</strong><br>"; //display file index (if multiple files)
-				var file = x.files[i];
-				if ('name' in file) {
-				  outputMessage += "name: " + file.name + "<br>";
-			}
-			if ('size' in file) {
-			  outputMessage += "size: " + file.size + " bytes <br>";
-			}
-		}
-	}
-	} 
-	  else {
-		if (x.value == "") {
-		  outputMessage += "Select one or more files.";
-		} else {
-		  outputMessage += "The files property is not supported by your browser!";
-		  outputMessage  += "<br>The path of the selected file: " + x.value; // If the browser does not support the files property, it will return the path of the selected file instead. 
-		}}
-
-	//display output to message
-	document.getElementById("fileContent").innerHTML = outputMessage; 
-	// console.log(outputMessage);
-}
 
 function main() 
 {

@@ -159,11 +159,8 @@ function parse_text_file(rawText){
 						vector=[];
 						vectorsIndex++;
 						vectorIndex = 0;
-						if (vector.length>0){
-							
-						}}}
-			}else 
-			if (dataType==''){
+					}}
+			}else if (dataType==''){
 				if (point[0]>1){
 					dataType='int';
 				}else{
@@ -189,7 +186,7 @@ function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
 		gl.uniform1f(offsetLoc, 1.0);
 		// start at the 2nd index becuase 0 = canvas
-		for(i=1;i<vectorList.length;i++){
+		for(i=0;i<vectorList.length;i++){
 			//set the vectors to be drawn
 			set_vector_points(gl,vectorList[i],vectorType);
 			//set the colors to be painted

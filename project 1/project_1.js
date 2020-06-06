@@ -6,69 +6,6 @@
  * @author Peter Subacz
  */
 
-function parse_text_file(rawText){
-	/*
-		quick and dirty parser used to get 2D vector points. the parser goes
-		line and splits the file by new lines and then bywhite spaces. if 
-		an item in a line is not empty, the item is cast as a float and 
-		stored in a vec4. If the 0th and 1st positions of the vec4 are set, 
-		the vec4 is added to a ploygon list. If there is a break in the lines, 
-		i 
-		item is then cast to covectors from text file
-		make a list of new points
-
-		returns list
-	*/
-	var floatCast = 0.0;//
-	var dataType = '';
-	var vectors = [];	// list to hold vectors
-	var vector = [];	// list of dump vector points 
-	var index = 0;			//indexes points written
-	var vectorIndex = 0;	//index to count number of vectors
-	var vectorsIndex = 0;	//indexes to count vectors in list
-	var lines = rawText.split(/\r?\n/g);
-	var point = vec4(0.0, 0.0, 0.0, 1.0);
-	var firstRun = true;
-	var extent = vec4(0.0, 0.0, 0.0, 1.0);
-
-	for(i=0;i<lines.length;i++){
-		point = vec4(0.0, 0.0, 0.0, 1.0);
-		index = 0;
-
-		var lineArray = lines[i].split(/(\s+)/);
-		for(ii=0;ii<lineArray.length;ii++){
-			if (lineArray[ii].length>0){
-				floatCast = parseFloat(lineArray[ii])
-				if (!isNaN(floatCast))
-				{
-					point[index] = floatCast;
-					index++
-				}}}
-		if (point[0]!=0.0 && point[1]!=0.0){
-			if (firstRun == true){
-				firstRun = false;
-				extent = point;
-			}
-			vector[vectorIndex] = point;
-			vectorIndex++;
-			if (dataType==''){
-				if (point[0]>1){
-					dataType='int';
-				}else{
-					dataType='flt';
-				}}
-		}else{
-			if (vector.length>0){
-				vectors[vectorsIndex] = vector;
-				vector=[];
-				vectorsIndex++;
-				vectorIndex = 0;
-			}}
-
-		}
-	return [vectors,dataType,extent];
-}
-
 function draw_mode()
 {
 	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
@@ -142,7 +79,7 @@ function set_viewports(gl,extents)
 	
 	//order of extents being passed left, top, right, bottom.
 	//left,right,bottom,top,near,far
-	console.log(extents[0][0]);
+	console.log(extents);
 	var projMatrix = ortho(extents[0],extents[2],extents[3],extents[1],-1,1);			 
 	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
 	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
@@ -156,6 +93,86 @@ function sum_(vector){
 	}
 	return vectorSum;
 }
+
+function parse_text_file(rawText){
+	/*
+		quick and dirty parser used to get 2D vector points. the parser goes
+		line and splits the file by new lines and then bywhite spaces. if 
+		an item in a line is not empty, the item is cast as a float and 
+		stored in a vec4. If the 0th and 1st positions of the vec4 are set, 
+		the vec4 is added to a ploygon list. If there is a break in the lines, 
+		i 
+		item is then cast to covectors from text file
+		make a list of new points
+
+		returns list
+	*/
+	var floatCast = 0.0;//
+	var dataType = '';
+	var vectors = [];	// list to hold vectors
+	var vector = [];	// list of dump vector points 
+	var index = 0;			//indexes points written
+	var vectorIndex = 0;	//index to count number of vectors
+	var vectorsIndex = 0;	//indexes to count vectors in list
+	var lines = rawText.split(/\r?\n/g);
+	var point = vec4(0.0, 0.0, 0.0, 1.0);
+	var numVertex = 0;
+	var totalVertex = 0;
+	var creatingVertex = false;
+	var extent = vec4(0.0, 0.0, 0.0, 1.0);
+
+	for(i=0;i<lines.length;i++){
+		point = vec4(0.0, 0.0, 0.0, 1.0);
+		index = 0;
+
+		var lineArray = lines[i].split(/(\s+)/);
+		for(ii=0;ii<lineArray.length;ii++){
+			if (lineArray[ii].length>0){
+				floatCast = parseFloat(lineArray[ii])
+				if (!isNaN(floatCast))
+				{
+					point[index] = floatCast;
+					index++
+				}}}
+
+		if(index>0){
+			//get extent
+			if(index == 4){
+				extent = point;
+				console.log('extent: '+extent);
+			}else if (index<4){
+				if (totalVertex == 0){
+					totalVertex = point[0];
+					console.log('total vertex: '+totalVertex);
+				}else if (numVertex == 0 && creatingVertex == false){
+					creatingVertex = true;
+					numVertex = point[0];
+					console.log('Number of vertices: '+numVertex)
+				}else if (creatingVertex = true){			//get xy points
+					if (vector.length <= numVertex-2){
+						vector[vectorIndex] = point;
+						vectorIndex++;
+					}else{
+						creatingVertex = false;
+						numVertex = 0;
+						vectors[vectorsIndex] = vector;
+						vector=[];
+						vectorsIndex++;
+						vectorIndex = 0;
+						if (vector.length>0){
+							
+						}}}
+			}else 
+			if (dataType==''){
+				if (point[0]>1){
+					dataType='int';
+				}else{
+					dataType='flt';
+				}}
+		}}
+	return [vectors,dataType,extent];
+}
+
 function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 	var vectorSum = 0.0;
 	if (vectorList == null){
@@ -178,7 +195,7 @@ function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 			//set the colors to be painted
 			set_colors(gl,vectorList[i],colorIndex);
 			// Draw a point
-			gl.drawArrays(gl.LINES, 0, vectorList[i].length);
+			gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length);
 		}}}
 
 async function upload_image() 

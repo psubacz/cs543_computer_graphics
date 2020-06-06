@@ -52,10 +52,11 @@ function set_colors(gl,vectorList,colorIndex){
 }
 
 function set_vector_points(gl,vectorList,vectorType){
+
 	var vBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, flatten(vectorList), gl.STATIC_DRAW);
-
+	
 	var vPosition = gl.getAttribLocation(program, "vPosition");
 	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vPosition);
@@ -80,7 +81,11 @@ function set_viewports(gl,extents)
 	//order of extents being passed left, top, right, bottom.
 	//left,right,bottom,top,near,far
 	console.log(extents);
-	var projMatrix = ortho(extents[0],extents[2],extents[3],extents[1],-1,1);			 
+	if (extents == null){
+		var projMatrix = ortho(0,640,0,480,-1,1);	
+	}else{
+		var projMatrix = ortho(extents[0],extents[2],extents[3],extents[1],-1,1);	
+	}		 
 	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
 	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
 	// gl.viewport( 0, 0, canvas.width, canvas.height);
@@ -107,66 +112,62 @@ function parse_text_file(rawText){
 
 		returns list
 	*/
-	var floatCast = 0.0;//
-	var dataType = '';
-	var vectors = [];	// list to hold vectors
-	var vector = [];	// list of dump vector points 
-	var index = 0;			//indexes points written
-	var vectorIndex = 0;	//index to count number of vectors
-	var vectorsIndex = 0;	//indexes to count vectors in list
-	var lines = rawText.split(/\r?\n/g);
-	var point = vec4(0.0, 0.0, 0.0, 1.0);
-	var numVertex = 0;
-	var totalVertex = 0;
-	var creatingVertex = false;
-	var extent = vec4(0.0, 0.0, 0.0, 1.0);
+	var extent = null
+	var dataType = '';			// data inside file, can be float of int
+	var vectors = [];			// list to hold vectors
+	var vector = [];			// list of dump vector points 
+	var creatingVertex = false;	// bool to create vertices
+	var totalVertex = 0;		// total number of vertices
+	var vertexPoints = 0;		// number of points in a vertex
+	var vectorIndex = 0;		// index to count number of vectors
+	var vectorsIndex = 0;		// indexes to count vectors in list
 
+	var lines = rawText.split(/\r?\n/g);			//split the string by new lines
 	for(i=0;i<lines.length;i++){
-		point = vec4(0.0, 0.0, 0.0, 1.0);
-		index = 0;
-
-		var lineArray = lines[i].split(/(\s+)/);
-		for(ii=0;ii<lineArray.length;ii++){
+		var point = vec4(0.0, 0.0, 0.0, 1.0);		//points to be written too
+		var index = 0;								//indexes points written
+		var lineArray = lines[i].split(/(\s+)/);	//split the string by spaces
+		for(ii=0;ii<lineArray.length;ii++){			//for each item in the line, cast to float 
 			if (lineArray[ii].length>0){
-				floatCast = parseFloat(lineArray[ii])
-				if (!isNaN(floatCast))
+				var floatCast = parseFloat(lineArray[ii])	
+				if (!isNaN(floatCast))				// if not NaN, set as point
 				{
 					point[index] = floatCast;
 					index++
-				}}}
-
-		if(index>0){
-			//get extent
-			if(index == 4){
-				extent = point;
+		}}}
+		if(index>0){								//if values have been set
+			if(index == 4){							// four values set mean its a extent (homogeneous unit will not change in this app)
+				var extent = point;
 				console.log('extent: '+extent);
-			}else if (index<4){
-				if (totalVertex == 0){
+			}else if (index<4){					 
+				if (totalVertex == 0){				// set total number of vertices
 					totalVertex = point[0];
 					console.log('total vertex: '+totalVertex);
-				}else if (numVertex == 0 && creatingVertex == false){
+				}else if (vertexPoints == 0 && creatingVertex == false){	// being creating a vertex
 					creatingVertex = true;
-					numVertex = point[0];
-					console.log('Number of vertices: '+numVertex)
-				}else if (creatingVertex = true){			//get xy points
-					if (vector.length <= numVertex-2){
+					vertexPoints = point[0];
+					console.log('Number of vertices: '+vertexPoints)
+				}else if (creatingVertex = true){			//while creating a vertes, set the points
+					if (vectorIndex < vertexPoints){
 						vector[vectorIndex] = point;
 						vectorIndex++;
-					}else{
-						creatingVertex = false;
-						numVertex = 0;
-						vectors[vectorsIndex] = vector;
-						vector=[];
-						vectorsIndex++;
-						vectorIndex = 0;
-					}}
-			}else if (dataType==''){
-				if (point[0]>1){
-					dataType='int';
-				}else{
-					dataType='flt';
-				}}
-		}}
+						if (dataType==''){		//set the data type
+							if (point[0]>1){
+									dataType='int';
+								}else{
+									dataType='flt';
+						}}
+						if (vectorIndex >= vertexPoints){	//if we have looped throught the points in a vertex, reset the creation values
+							creatingVertex = false;
+							vertexPoints = 0;
+							vectors[vectorsIndex] = vector;
+							vector=[];
+							vectorsIndex++;
+							vectorIndex = 0;
+				}}}}else{
+				// do nothing
+				console.log("Warning, line "+i+" has more than 4 items.");
+	}}}
 	return [vectors,dataType,extent];
 }
 
@@ -175,16 +176,11 @@ function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 	if (vectorList == null){
 		document.getElementById('pageMode').innerHTML = 'File Mode';
 	}else{
-		// var extent = vectorList[0][0]
-		vectorSum = sum_(extent);
-		if (vectorSum>0.0 || vectorSum<0.0){
-			// set_viewports(gl,vectorList[0]);
-			set_viewports(gl,extent);
-		}
+		set_viewports(gl,extent);
 		// 
 		reset_canvas(gl);
 		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-		gl.uniform1f(offsetLoc, 1.0);
+		gl.uniform1f(offsetLoc, 3.0);
 		// start at the 2nd index becuase 0 = canvas
 		for(i=0;i<vectorList.length;i++){
 			//set the vectors to be drawn
@@ -220,10 +216,10 @@ async function upload_image()
 	} 
 	  else {
 		if (x.value == "") {
-		//   outputMessage += "Select one or more files.";
+		  outputMessage += "Select one or more files.";
 		} else {
-		//   outputMessage += "The files property is not supported by your browser!";
-		//   outputMessage  += "<br>The path of the selected file: " + x.value; // If the browser does not support the files property, it will return the path of the selected file instead. 
+		  outputMessage += "The files property is not supported by your browser!";
+		  outputMessage  += "<br>The path of the selected file: " + x.value; // If the browser does not support the files property, it will return the path of the selected file instead. 
 		}}
 
 	//display output to message
@@ -307,11 +303,16 @@ function main()
 			//file mode
 			document.getElementById("pageMode").innerHTML = 'File Mode';	//Display the mode
 			document.getElementById('image-file').style.display = 'block';	//Display the button
+			document.getElementById("fileContent").hidden = false;
+			file_mode(gl,null,null,null,null);
+			reset_canvas(gl);
 			break;
 
 		case 'd':
 			//draw mode
+			document.getElementById("fileContent").hidden = true;
 			draw_mode()
+			reset_canvas(gl);
 			break;
 
 		case 'c':

@@ -127,12 +127,35 @@ function set_vector_points(gl,vectorList,vectorType){
 	gl.enableVertexAttribArray(vPosition);
 }
 
+function set_viewports(gl,extents)
+{
+	// If the aspect ratio is less than 1, calculate the width
+	// If the aspect ratio is greator than 1, calculate the 
+	// If the aspect ration is 1, do nothing?
+	// w	 w
+	// -  = -
+	// h 	 h
+
+	//Set up the viewport
+	//x, y - specify the lower-left corner of the viewport rectangle (in pixels)
+	//In WebGL, x and y are specified in the <canvas> coordinate system
+	//width, height - specify the width and height of the viewport (in pixels)
+	//canvas is the window, and viewport is the viewing area within that window
+	//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
+	
+	
+	gl.viewport( 0, 0, canvas.width, canvas.height);
+}
+
 function file_mode(gl,vectorList,vectorType,colorIndex){
 	if (vectorList == null){
+		document.getElementById('pageMode').innerHTML = 'File Mode';
 	}else{
 		reset_canvas(gl);
 		// start at the 2nd index becuase 0 = canvas
 		for(i=1;i<vectorList.length;i++){
+
+			// set_viewports(gl);
 
 			var offsetLoc = gl.getUniformLocation(program, "vPointSize");
 			gl.uniform1f(offsetLoc, 1.0);

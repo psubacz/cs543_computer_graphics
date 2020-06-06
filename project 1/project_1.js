@@ -23,14 +23,13 @@ function parse_text_file(rawText){
 	var dataType = '';
 	var vectors = [];	// list to hold vectors
 	var vector = [];	// list of dump vector points 
-
-	//indexes to count locations
-	var index = 0;
-	var vectorIndex = 0;
-	var vectorsIndex = 0;
-
+	var index = 0;			//indexes points written
+	var vectorIndex = 0;	//index to count number of vectors
+	var vectorsIndex = 0;	//indexes to count vectors in list
 	var lines = rawText.split(/\r?\n/g);
 	var point = vec4(0.0, 0.0, 0.0, 1.0);
+	var firstRun = true;
+	var extent = vec4(0.0, 0.0, 0.0, 1.0);
 
 	for(i=0;i<lines.length;i++){
 		point = vec4(0.0, 0.0, 0.0, 1.0);
@@ -45,21 +44,17 @@ function parse_text_file(rawText){
 					point[index] = floatCast;
 					index++
 				}}}
-		//O
 		if (point[0]!=0.0 && point[1]!=0.0){
+			if (firstRun == true){
+				firstRun = false;
+				extent = point;
+			}
 			vector[vectorIndex] = point;
 			vectorIndex++;
-			//set the datatypes we are working with. the floating point
-			// are normalized from -1 to 1, therefore values >1 can be 
-			// assumed to be ints. 
 			if (dataType==''){
 				if (point[0]>1){
-					// vectors.unshift('int');
-					console.log('vector type: int');
 					dataType='int';
 				}else{
-					// vectors.unshift('vector type: flt');
-					console.log('vector type: flt');
 					dataType='flt';
 				}}
 		}else{
@@ -68,8 +63,10 @@ function parse_text_file(rawText){
 				vector=[];
 				vectorsIndex++;
 				vectorIndex = 0;
-			}}}
-	return [vectors,dataType];
+			}}
+
+		}
+	return [vectors,dataType,extent];
 }
 
 function draw_mode()
@@ -146,7 +143,7 @@ function set_viewports(gl,extents)
 	//order of extents being passed left, top, right, bottom.
 	//left,right,bottom,top,near,far
 	console.log(extents[0][0]);
-	var projMatrix = ortho(extents[0][0],extents[0][2],extents[0][3 ],extents[0][1],-1,1);			 
+	var projMatrix = ortho(extents[0],extents[2],extents[3],extents[1],-1,1);			 
 	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
 	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
 	// gl.viewport( 0, 0, canvas.width, canvas.height);
@@ -159,32 +156,27 @@ function sum_(vector){
 	}
 	return vectorSum;
 }
-function file_mode(gl,vectorList,vectorType,colorIndex){
+function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 	var vectorSum = 0.0;
 	if (vectorList == null){
 		document.getElementById('pageMode').innerHTML = 'File Mode';
 	}else{
-		var extent = vectorList[0][0]
+		// var extent = vectorList[0][0]
 		vectorSum = sum_(extent);
 		if (vectorSum>0.0 || vectorSum<0.0){
-			set_viewports(gl,vectorList[0]);
+			// set_viewports(gl,vectorList[0]);
+			set_viewports(gl,extent);
 		}
-
+		// 
 		reset_canvas(gl);
+		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
+		gl.uniform1f(offsetLoc, 1.0);
 		// start at the 2nd index becuase 0 = canvas
 		for(i=1;i<vectorList.length;i++){
-
-			// set_viewports(gl);
-
-			var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-			gl.uniform1f(offsetLoc, 1.0);
-
 			//set the vectors to be drawn
 			set_vector_points(gl,vectorList[i],vectorType);
-
 			//set the colors to be painted
 			set_colors(gl,vectorList[i],colorIndex);
-			
 			// Draw a point
 			gl.drawArrays(gl.LINES, 0, vectorList[i].length);
 		}}}
@@ -230,7 +222,7 @@ function main()
 	var colorIndex = 0;
 	var colorList = ["Color: Black", "Color: Red", "Color: Green", "Color: Blue"];
 	var currentColor = colorList[colorIndex];
-	var vectorsList = [];
+	var resultsList = [];
 
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');
@@ -249,10 +241,10 @@ function main()
 	document.getElementById('image-file').addEventListener('change', function() {
 		var fr = new FileReader();
 		fr.onload= function (e){
-			vectorsList = parse_text_file(fr.result);
+			resultsList = parse_text_file(fr.result);
 			console.log('Jobs Done')
 			// var vectorsReady = true;
-			file_mode(gl,vectorsList[0],vectorsList[1],colorIndex)
+			file_mode(gl,resultsList[0],resultsList[1],resultsList[2],colorIndex)
 		}
 		fr.readAsText(this.files[0]);
 	}) 
@@ -316,7 +308,7 @@ function main()
 				colorIndex = 0;
 			}
 			document.getElementById("colorMode").innerHTML = colorList[colorIndex];
-			file_mode(gl,vectorsList[0],vectorsList[1],colorIndex)
+			file_mode(gl,resultsList[0],resultsList[1],resultsList[2],colorIndex)
 		}
 	}
 }

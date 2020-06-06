@@ -17,46 +17,68 @@ function init(){
 
 function parse_text_file(rawText){
 	/*
-		quick and dirty parser used to get polygons from text file
+		quick and dirty parser used to get 2D vector points. the parser goes
+		line and splits the file by new lines and then bywhite spaces. if 
+		an item in a line is not empty, the item is cast as a float and 
+		stored in a vec4. If the 0th and 1st positions of the vec4 are set, 
+		the vec4 is added to a ploygon list. If there is a break in the lines, 
+		i 
+		item is then cast to covectors from text file
 		make a list of new points
 
 		returns list
 	*/
-	var polygons = [];
-	var polygonsIndex = 0;
-	var polygon = [];
-	var polygonIndex = 0;
-	var lines = rawText.split(/\r?\n/g);
-	var floatCast = 0.0;
+	var floatCast = 0.0;//
+	var dataType = '';
+	var vectors = [];	// list to hold vectors
+	var vector = [];	// list of dump vector points 
+
+	//indexes to count locations
 	var index = 0;
+	var vectorIndex = 0;
+	var vectorsIndex = 0;
+
+	var lines = rawText.split(/\r?\n/g);
+	var point = vec4(0.0, 0.0, 0.0, 1.0);
 
 	for(i=0;i<lines.length;i++){
-		var point = vec4(0.0, 0.0, 0.0, 1.0);
+		point = vec4(0.0, 0.0, 0.0, 1.0);
+		index = 0;
+
 		var lineArray = lines[i].split(/(\s+)/);
 		for(ii=0;ii<lineArray.length;ii++){
-			if (lineArray[ii].length>2){
+			if (lineArray[ii].length>0){
 				floatCast = parseFloat(lineArray[ii])
 				if (!isNaN(floatCast))
 				{
-					point[index] = floatCast
+					point[index] = floatCast;
 					index++
-				}
-			}
-		}
-		if (index>0){
-			polygon[polygonIndex] = point;
-			polygonIndex++;
-			index = 0;
+				}}}
+		//O
+		if (point[0]!=0.0 && point[1]!=0.0){
+			vector[vectorIndex] = point;
+			vectorIndex++;
+			//set the datatypes we are working with. the floating point
+			// are normalized from -1 to 1, therefore values >1 can be 
+			// assumed to be ints. 
+			if (dataType==''){
+				if (point[0]>1){
+					// vectors.unshift('int');
+					console.log('vector type: int');
+					dataType='int';
+				}else{
+					// vectors.unshift('vector type: flt');
+					console.log('vector type: flt');
+					dataType='flt';
+				}}
 		}else{
-			if (polygon.length>0){
-				polygons[polygonsIndex] = polygon
-				polygon=[];
-				polygonsIndex++;
-				polygonIndex = 0;
-			}
-		}
-	}
-	return polygons;
+			if (vector.length>0){
+				vectors[vectorsIndex] = vector;
+				vector=[];
+				vectorsIndex++;
+				vectorIndex = 0;
+			}}}
+	return [vectors,dataType];
 }
 
 async function draw_mode()
@@ -66,47 +88,49 @@ async function draw_mode()
 	// await ;
 }
 
- function file_mode(gl,polygonList)
+ function file_mode(gl,vectorList,vectorType)
 {
-	if (polygonList == null){
-
+	if (vectorList == null){
 	}else{
 		// Set clear color
 		gl.clearColor(1.0, 1.0, 1.0, 1.0);
 		// Clear <canvas> by clearing the color buffer
 		gl.clear(gl.COLOR_BUFFER_BIT);
-		console.log(polygonList.size)
-	for(i=1;i<polygonList.length;i++){
-		var vBuffer = gl.createBuffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygonList[i]), gl.STATIC_DRAW);
 
-		var vPosition = gl.getAttribLocation(program, "vPosition");
-		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(vPosition);
 
-		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-		gl.uniform1f(offsetLoc, 1.0);
 
-		/*** COLOR DATA ***/
-		var colors = [];
-		for(ii=1;ii<polygonList[i].length+1;ii++){
-			colors.push(vec4(0.0, 0.0, 0.0, 1.0));
-		}
 
-		var cBuffer = gl.createBuffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-
-		var vColor = gl.getAttribLocation(program, "vColor");
-		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(vColor);
 		
-		// Draw a point
-		gl.drawArrays(gl.LINES_STRIP, 0, polygonList[i].length);
-		}
-	}
-}
+		// start at the 2nd index becuase 0 = canvas
+		for(i=1;i<vectorList.length;i++){
+			var vBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten(vectorList[i]), gl.STATIC_DRAW);
+
+			var vPosition = gl.getAttribLocation(program, "vPosition");
+			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vPosition);
+
+			var offsetLoc = gl.getUniformLocation(program, "vPointSize");
+			gl.uniform1f(offsetLoc, 1.0);
+
+			/*** COLOR DATA ***/
+			var colors = [];
+			for(ii=1;ii<vectorList[i].length+1;ii++){
+				colors.push(vec4(0.0, 0.0, 0.0, 1.0));
+			}
+
+			var cBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+
+			var vColor = gl.getAttribLocation(program, "vColor");
+			gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vColor);
+			
+			// Draw a point
+			gl.drawArrays(gl.LINES_STRIP, 0, vectorList[i].length);
+		}}}
 
 function change_color(colorIndex,colorList)
 {
@@ -167,15 +191,15 @@ function main()
 	// Initialize the document mode and settings
 	init();
 
-	var polygonsList = [];
+	var vectorsList = [];
 	// Add the event listener to parse input file
 	document.getElementById('image-file').addEventListener('change', function() {
 		var fr = new FileReader();
 		fr.onload= function (e){
-			polygonsList = parse_text_file(fr.result);
+			vectorsList = parse_text_file(fr.result);
 			console.log('Jobs Done')
-			// var polygonsReady = true;
-			file_mode(gl,polygonsList)
+			// var vectorsReady = true;
+			file_mode(gl,vectorsList[0],vectorsList[1])
 		}
 		fr.readAsText(this.files[0]);
 	}) 

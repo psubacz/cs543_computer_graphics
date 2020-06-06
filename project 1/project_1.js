@@ -143,14 +143,32 @@ function set_viewports(gl,extents)
 	//canvas is the window, and viewport is the viewing area within that window
 	//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
 	
-	
-	gl.viewport( 0, 0, canvas.width, canvas.height);
+	//order of extents being passed left, top, right, bottom.
+	//left,right,bottom,top,near,far
+	console.log(extents[0][0]);
+	var projMatrix = ortho(extents[0][0],extents[0][2],extents[0][3 ],extents[0][1],-1,1);			 
+	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
+	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
+	// gl.viewport( 0, 0, canvas.width, canvas.height);
 }
 
+function sum_(vector){
+	var vectorSum =0.0;
+	for(i=0; i<vector[0].length;i++){
+		vectorSum = vectorSum+vector[0][i];
+	}
+	return vectorSum;
+}
 function file_mode(gl,vectorList,vectorType,colorIndex){
+	var vectorSum = 0.0;
 	if (vectorList == null){
 		document.getElementById('pageMode').innerHTML = 'File Mode';
 	}else{
+		vectorSum = sum_(vectorList[0]);
+		if (vectorSum>0.0 || vectorSum<0.0){
+			set_viewports(gl,vectorList[0]);
+		}
+
 		reset_canvas(gl);
 		// start at the 2nd index becuase 0 = canvas
 		for(i=1;i<vectorList.length;i++){
@@ -167,7 +185,7 @@ function file_mode(gl,vectorList,vectorType,colorIndex){
 			set_colors(gl,vectorList[i],colorIndex);
 			
 			// Draw a point
-			gl.drawArrays(gl.LINES_STRIP, 0, vectorList[i].length);
+			gl.drawArrays(gl.LINES, 0, vectorList[i].length);
 		}}}
 
 async function upload_image() 

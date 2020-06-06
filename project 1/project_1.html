@@ -8,11 +8,15 @@
 	attribute vec4 vPosition;	
 	attribute vec4 vColor;
 	uniform float vPointSize;
+	uniform mat4 modelMatrix;
+	uniform mat4 projMatrix; 
 	varying vec4 fColor;
+
 	void main() {
-		gl_Position = vPosition;
+		gl_Position = projMatrix * vPosition; //point position
 		gl_PointSize = vPointSize;
 		fColor = vColor;
+		
   	}
 	</script>
 	

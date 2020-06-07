@@ -177,7 +177,7 @@ function set_projection(gl,extents)
 	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
 }
 
-function render(gl,vectorList,vectorType,extent,colorIndex){
+function render(gl,vectorList,vectorType,extent,colorIndex,firstClick){
 	//
 	//	Renders passed data to the canvas. 
 	//
@@ -199,8 +199,13 @@ function render(gl,vectorList,vectorType,extent,colorIndex){
 			set_vector_points(gl,vectorList[i],vectorType);
 			//set the colors to be painted
 			set_colors(gl,vectorList[i],colorIndex);
+			if (vectorList[i].length<=1){
+				gl.drawArrays(gl.POINTS, 0, vectorList[i].length);
+			}else{
+				gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length)
+			}
 			// Draw a point
-			gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length);
+			
 		}}
 	return vectorList;
 }
@@ -241,6 +246,7 @@ function main(gl,drawPoints)
 	var extent = null;		//draw mode points
 	var drawList = [[]];
 	var drawIndex = 0;
+	var firstClick = true;
 
 	// display the current color
 	document.getElementById('colorMode').innerHTML = currentColor
@@ -259,7 +265,7 @@ function main(gl,drawPoints)
 			[vectorList,dataType,extent] = parse_text_file(fr.result);
 			console.log('Jobs Done')
 			// var vectorsReady = true;
-			vectorList= render(gl,vectorList,dataType,extent,colorIndex,pageMode)
+			vectorList= render(gl,vectorList,dataType,extent,colorIndex,false)
 		}
 		fr.readAsText(this.files[0]);
 	}) 
@@ -278,14 +284,10 @@ function main(gl,drawPoints)
 			vectorList[drawIndex].push(vec4(xPos, yPos,0.0,1.0));
 
 			if (vectorList[drawIndex].length>99){
-				[vectorList, drawPoints, drawIndex] = shear_array(drawList, drawPoints, drawIndex)
-				// drawList.push(drawPoints);
-				// drawIndex++;
-				// drawList[drawIndex] = [];
+				[vectorList, drawPoints, drawIndex] = shear_array(drawList, drawPoints, drawIndex);
 			}
-			if(vectorList[0].length>1){
-				render(gl,vectorList,'flt',extent,colorIndex,pageMode);
-			}
+			render(gl,vectorList,'flt',extent,colorIndex,firstClick);
+			firstClick = false;
 		}})
 
 	if (!gl)
@@ -324,6 +326,7 @@ function main(gl,drawPoints)
 
 		case 'd':
 			//draw mode
+			firstClick = true;
 			vectorList = [[]];
 			pageMode = draw_mode();
 			break;
@@ -340,6 +343,6 @@ function main(gl,drawPoints)
 				[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex)
 				break;
 		}
-	render(gl,vectorList,dataType,extent,colorIndex,pageMode)
+	render(gl,vectorList,dataType,extent,colorIndex,firstClick)
 	}
 }

@@ -7,7 +7,100 @@
  */
 
 
+function upload_image()
+{
+	var uploadedFile = document.getElementById("image-file");
+	var outputMessage = "";
+	var file = uploadedFile.files[0];
+	if ('name' in file) {
+		outputMessage += "name: " + file.name + "<br>";
+	}
+	if ('size' in file) {
+		outputMessage += "size: " + file.size + " bytes <br>";
+	}
+	//display output to message
+	document.getElementById("fileContent").innerHTML = outputMessage;
+}
 
+function parse_text_file(rawText){
+	/*
+		Parser used to get 2D vector points. the parser goes splits the file by 
+		new lines and then bywhite spaces. if an item in a line is not empty, the 
+		item is cast as a float and stored in a vec4. If the 0th and 1st positions 
+		of the vec4 are set, the vec4 is added to a ploygon list. If there is a 
+		break in the lines, a new list of points in started.
+
+		returns list
+	*/
+
+	//display file name and size
+	var uploadedFile = document.getElementById("image-file");
+	var outputMessage = "";
+	var file = uploadedFile.files[0];
+	if ('name' in file) {
+		outputMessage += "name: " + file.name + "<br>";
+	}
+	if ('size' in file) {
+		outputMessage += "size: " + file.size + " bytes <br>";
+	}
+	//display output to message
+	document.getElementById("fileContent").innerHTML = outputMessage; 
+
+	var extent = null
+	var dataType = '';			// data inside file, can be float of int
+	var vectors = [];			// list to hold vectors
+	var vector = [];			// list of dump vector points 
+	var creatingVertex = false;	// bool to create vertices
+	var totalVertex = 0;		// total number of vertices
+	var vertexPoints = 0;		// number of points in a vertex
+	var vectorIndex = 0;		// index to count number of vectors
+	var vectorsIndex = 0;		// indexes to count vectors in list
+
+	var lines = rawText.split(/\r?\n/g);			//split the string by new lines
+	for(i=0;i<lines.length;i++){
+		var point = vec4(0.0, 0.0, 0.0, 1.0);		//points to be written too
+		var index = 0;								//indexes points written
+		var lineArray = lines[i].split(/(\s+)/);	//split the string by spaces
+		for(ii=0;ii<lineArray.length;ii++){			//for each item in the line, cast to float 
+			if (lineArray[ii].length>0){
+				var floatCast = parseFloat(lineArray[ii])	
+				if (!isNaN(floatCast))				// if not NaN, set as point
+				{
+					point[index] = floatCast;
+					index++
+		}}}
+		if(index>0){								//if values have been set
+			if(index == 4){							// four values set mean its a extent (homogeneous unit will not change in this app)
+				var extent = point;
+			}else if (index<4){					 
+				if (totalVertex == 0){				// set total number of vertices
+					totalVertex = point[0];
+				}else if (vertexPoints == 0 && creatingVertex == false){	// being creating a vertex
+					creatingVertex = true;
+					vertexPoints = point[0];
+				}else if (creatingVertex = true){			//while creating a vertes, set the points
+					if (vectorIndex < vertexPoints){
+						vector[vectorIndex] = point;
+						vectorIndex++;
+						if (dataType==''){		//set the data type
+							if (point[0]>1){
+								dataType='int';
+							}else{
+								dataType='flt';
+							}}
+						if (vectorIndex >= vertexPoints){	//if we have looped throught the points in a vertex, reset the creation values
+							creatingVertex = false;
+							vertexPoints = 0;
+							vectors[vectorsIndex] = vector;
+							vector=[];
+							vectorsIndex++;
+							vectorIndex = 0;
+				}}}}else{
+				// do nothing
+				console.log("Warning, line "+i+" has more than 4 items.");
+	}}}
+	return [vectors,dataType,extent];
+}
 function reset_canvas(gl){
 		// Set clear color
 		gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -57,159 +150,93 @@ function set_vector_points(gl,vectorList,vectorType){
 	gl.enableVertexAttribArray(vPosition);
 }
 
-function set_viewports(gl,extents)
+function set_projection(gl,extents)
 {
-	// If the aspect ratio is less than 1, calculate the width
-	// If the aspect ratio is greator than 1, calculate the 
-	// If the aspect ration is 1, do nothing?
-	// w	 w
-	// -  = -
-	// h 	 h
-
-	//Set up the viewport
-	//x, y - specify the lower-left corner of the viewport rectangle (in pixels)
-	//In WebGL, x and y are specified in the <canvas> coordinate system
-	//width, height - specify the width and height of the viewport (in pixels)
-	//canvas is the window, and viewport is the viewing area within that window
-	//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
-	
-	//order of extents being passed left, top, right, bottom.
-	//left,right,bottom,top,near,far
-	console.log(extents);
-	if (extents == null){
-		var projMatrix = ortho(0,640,0,480,-1,1);	
+	var canvas = document.getElementById('webgl');
+	gl.viewport( 0, 0,  canvas.width, canvas.height);
+	// var aspectRatio = canvas.width/canvas.height;
+	if (extents != null){
+		var projMatrix = ortho(extents[0],
+			extents[2],
+			extents[3],
+			extents[1],
+			-1,
+			1);	
 	}else{
-		var projMatrix = ortho(extents[0],extents[2],extents[3],extents[1],-1,1);	
-	}		 
+		var viewAspectRatio = canvas.width/canvas.height;
+		var targetWidth = 640;
+		var targetHieght = 480;
+		var targetAspectRatio =targetWidth /targetHieght; 
+		if (viewAspectRatio>=targetAspectRatio){
+			var projMatrix = ortho(0,targetAspectRatio*targetWidth,0,targetHieght,-1,1);
+		}else{
+			var projMatrix = ortho(0,targetWidth,0,targetAspectRatio*targetHieght,-1,1);
+		}
+	}
 	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
 	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
 }
 
-function sum_(vector){
-	var vectorSum =0.0;
-	for(i=0; i<vector.length;i++){
-		vectorSum = vectorSum+vector[i];
-	}
-	return vectorSum;
-}
-
-function parse_text_file(rawText){
-	/*
-		quick and dirty parser used to get 2D vector points. the parser goes
-		line and splits the file by new lines and then bywhite spaces. if 
-		an item in a line is not empty, the item is cast as a float and 
-		stored in a vec4. If the 0th and 1st positions of the vec4 are set, 
-		the vec4 is added to a ploygon list. If there is a break in the lines, 
-		i 
-		item is then cast to covectors from text file
-		make a list of new points
-
-		returns list
-	*/
-	var uploadedFile = document.getElementById("image-file");
-	var outputMessage = "";
-	var file = uploadedFile.files[0];
-	if ('name' in file) {
-		outputMessage += "name: " + file.name + "<br>";
-	}
-	if ('size' in file) {
-		outputMessage += "size: " + file.size + " bytes <br>";
-	}
-	//display output to message
-	document.getElementById("fileContent").innerHTML = outputMessage; 
-
-	var extent = null
-	var dataType = '';			// data inside file, can be float of int
-	var vectors = [];			// list to hold vectors
-	var vector = [];			// list of dump vector points 
-	var creatingVertex = false;	// bool to create vertices
-	var totalVertex = 0;		// total number of vertices
-	var vertexPoints = 0;		// number of points in a vertex
-	var vectorIndex = 0;		// index to count number of vectors
-	var vectorsIndex = 0;		// indexes to count vectors in list
-
-	var lines = rawText.split(/\r?\n/g);			//split the string by new lines
-	for(i=0;i<lines.length;i++){
-		var point = vec4(0.0, 0.0, 0.0, 1.0);		//points to be written too
-		var index = 0;								//indexes points written
-		var lineArray = lines[i].split(/(\s+)/);	//split the string by spaces
-		for(ii=0;ii<lineArray.length;ii++){			//for each item in the line, cast to float 
-			if (lineArray[ii].length>0){
-				var floatCast = parseFloat(lineArray[ii])	
-				if (!isNaN(floatCast))				// if not NaN, set as point
-				{
-					point[index] = floatCast;
-					index++
-		}}}
-		if(index>0){								//if values have been set
-			if(index == 4){							// four values set mean its a extent (homogeneous unit will not change in this app)
-				var extent = point;
-				console.log('extent: '+extent);
-			}else if (index<4){					 
-				if (totalVertex == 0){				// set total number of vertices
-					totalVertex = point[0];
-					console.log('total vertex: '+totalVertex);
-				}else if (vertexPoints == 0 && creatingVertex == false){	// being creating a vertex
-					creatingVertex = true;
-					vertexPoints = point[0];
-					console.log('Number of vertices: '+vertexPoints)
-				}else if (creatingVertex = true){			//while creating a vertes, set the points
-					if (vectorIndex < vertexPoints){
-						vector[vectorIndex] = point;
-						vectorIndex++;
-						if (dataType==''){		//set the data type
-							if (point[0]>1){
-									dataType='int';
-								}else{
-									dataType='flt';
-						}}
-						if (vectorIndex >= vertexPoints){	//if we have looped throught the points in a vertex, reset the creation values
-							creatingVertex = false;
-							vertexPoints = 0;
-							vectors[vectorsIndex] = vector;
-							vector=[];
-							vectorsIndex++;
-							vectorIndex = 0;
-				}}}}else{
-				// do nothing
-				console.log("Warning, line "+i+" has more than 4 items.");
-	}}}
-	return [vectors,dataType,extent];
-}
-
-function file_mode(gl,vectorList,vectorType,extent,colorIndex){
-	var vectorSum = 0.0;
-	if (vectorList == null){
-		document.getElementById('pageMode').innerHTML = 'File Mode';
-	}else{
-		set_viewports(gl,extent);
-		// 
+function render(gl,vectorList,vectorType,extent,colorIndex){
+	//
+	//	Renders passed data to the canvas. 
+	//
+	// returns list
+	//
+	if (vectorList.length ==0){//there are no points to draw,
+		document.getElementById('fileContent').innerHTML = 'Rut-Roh! No points to draw, how did you get here?';
+	}else{//if the are points to draw
+		//reset the canvas when called
 		reset_canvas(gl);
+		//set the orthographic projection for 2d data
+		set_projection(gl,extent);
+		//set the draw point size
 		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
 		gl.uniform1f(offsetLoc, 3.0);
-		// start at the 2nd index becuase 0 = canvas
+		// for vector in vectors, draw and color each vector point
 		for(i=0;i<vectorList.length;i++){
 			//set the vectors to be drawn
 			set_vector_points(gl,vectorList[i],vectorType);
 			//set the colors to be painted
 			set_colors(gl,vectorList[i],colorIndex);
 			// Draw a point
-			gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length);
-		}}}
+			gl.drawArrays(gl.POINTS, 0, vectorList[i].length);
+		}}
+	return vectorList;
+}
+
+function file_mode(){
+	// displays html items for the file mode
+	document.getElementById("pageMode").innerHTML = 'Mode: File';	//Display the mode
+	document.getElementById('image-file').style.display = 'block';	//Display the button
+	document.getElementById("fileContent").hidden = false;
+	document.getElementById('fileContent').innerHTML = 'Upload a file to draw!';
+	return 0;
+}
 
 function draw_mode()
 {
-	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
-	document.getElementById('image-file').style.display = 'none';	//Display the button
-	// await ;
+	// displays html items for the draw mode
+	document.getElementById("pageMode").innerHTML = 'Mode: Draw';	//Display the mode
+	document.getElementById("fileContent").hidden = true;		
+	document.getElementById('fileContent').innerHTML = 'Click inside the box to draw points!';
+	return 1;
 }
 
-function main() 
+function main(gl,drawPoints) 
 {
+	// Initialize the document mode and settings
 	var colorIndex = 0;
+	var pageMode = file_mode();
 	var colorList = ["Color: Black", "Color: Red", "Color: Green", "Color: Blue"];
 	var currentColor = colorList[colorIndex];
-	var resultsList = [];
+	var vectorList = [];
+	var dataType = '';
+	var extent = null;
+	var drawPoints = [];		//draw mode points
+	var drawList = []
+
+	document.getElementById('colorMode').innerHTML = currentColor
 
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');
@@ -217,25 +244,40 @@ function main()
 	// Get the rendering context for WebGL
 	var gl = WebGLUtils.setupWebGL(canvas);
 
-	// Initialize the document mode and settings
-	//display the file upload button
-	document.getElementById('image-file').style.display = 'block';
-	//display the current mode the user is in.
-	document.getElementById('pageMode').innerHTML = 'File Mode';
-	//display the default color being displayed mode 
-	document.getElementById('colorMode').innerHTML = currentColor
 	// Add the event listener to parse input file
 	document.getElementById('image-file').addEventListener('change', function() {
 		var fr = new FileReader();
 		fr.onload= function (e){
-			resultsList = parse_text_file(fr.result);
+			// resultsList = parse_text_file(fr.result);
+			[vectorList,dataType,extent] = parse_text_file(fr.result);
 			console.log('Jobs Done')
 			// var vectorsReady = true;
-			file_mode(gl,resultsList[0],resultsList[1],resultsList[2],colorIndex)
+			vectorList= render(gl,vectorList,dataType,extent,colorIndex,pageMode)
 		}
 		fr.readAsText(this.files[0]);
 	}) 
 
+	// add event listener for draw mode
+	canvas.addEventListener("click", function() {
+		if (pageMode ==1)
+		{
+			var rect = canvas.getBoundingClientRect();
+			var xPos = arguments[0].clientX - rect.left;
+			var yPos = arguments[0].clientY - rect.top;
+			console.log('x: '+xPos+' y: '+yPos);
+			drawPoints.push(vec4(xPos, yPos,0.0,1.0));
+			if (drawPoints.length>3){
+				drawList.push(drawPoints);
+				drawPoints = [];
+			}
+			if(drawList.length<1){
+				render(gl,[drawPoints],'flt',vec4(1,1,-1,-1),colorIndex,pageMode);
+			}else{
+				render(gl,[drawList],'flt',vec4(1,1,-1,-1),colorIndex,pageMode);
+			}
+			
+		}
+	})
 
 	if (!gl)
 	{
@@ -249,17 +291,6 @@ function main()
 
 	// We tell WebGL which shader program to execute.
 	gl.useProgram(program);
-
-	//Set up the viewport
-	//x, y - specify the lower-left corner of the viewport rectangle (in pixels)
-	//In WebGL, x and y are specified in the <canvas> coordinate system
-	//width, height - specify the width and height of the viewport (in pixels)
-	//canvas is the window, and viewport is the viewing area within that window
-		//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
-	gl.viewport( 0, 0, canvas.width, canvas.height);
-
-	//start off in filemode
-	file_mode(gl,null,null,null,null);
 
 	window.onkeypress = function(event)
 	{
@@ -278,18 +309,13 @@ function main()
 
 		case 'f':
 			//file mode
-			document.getElementById("pageMode").innerHTML = 'File Mode';	//Display the mode
-			document.getElementById('image-file').style.display = 'block';	//Display the button
-			document.getElementById("fileContent").hidden = false;
-			file_mode(gl,null,null,null,null);
-			reset_canvas(gl);
+			pageMode = file_mode();
 			break;
 
 		case 'd':
 			//draw mode
-			document.getElementById("fileContent").hidden = true;
-			draw_mode()
-			reset_canvas(gl);
+			
+			pageMode = draw_mode();
 			break;
 
 		case 'c':
@@ -300,7 +326,7 @@ function main()
 				colorIndex = 0;
 			}
 			document.getElementById("colorMode").innerHTML = colorList[colorIndex];
-			file_mode(gl,resultsList[0],resultsList[1],resultsList[2],colorIndex)
 		}
+	render(gl,vectorList,dataType,extent,colorIndex,pageMode)
 	}
 }

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
+	<meta charset="utf-8" />
+	
 	<title>Subacz Project 1</title>
 	
 	<script id="vshader" type="x-shader/x-vertex">
@@ -37,16 +38,12 @@
   </head>
  
   <body onload="main()">
-	<p id="colorMode"></p>
 	<p id="pageMode"></p>
-    <canvas id="webgl" width="400" height="400">
+	<p id="colorMode"></p>
+    <canvas id="webgl" width="400" height="400" style=" border:1px solid #000000;">
     	Please use a browser that supports the "canvas" tag.
 	</canvas>
-
 	<p id="fileContent"></p>
-
-	<!--  -->
 	<input id="image-file" type="file" onchange="upload_image()" accept=".dat">
-
   </body>
 </html>

@@ -13,10 +13,10 @@ function upload_image()
 	var outputMessage = "";
 	var file = uploadedFile.files[0];
 	if ('name' in file) {
-		outputMessage += "name: " + file.name + "<br>";
+		outputMessage += "name: " + file.name + "<br>"; //display the file name
 	}
 	if ('size' in file) {
-		outputMessage += "size: " + file.size + " bytes <br>";
+		outputMessage += "size: " + file.size + " bytes <br>"; //display the size of the file
 	}
 	//display output to message
 	document.getElementById("fileContent").innerHTML = outputMessage;
@@ -114,19 +114,19 @@ function set_colors(gl,vectorList,colorIndex){
 	for(ii=1;ii<vectorList.length+1;ii++){
 		switch (colorIndex){
 			case 0:
-				colors.push(vec4(0.0, 0.0, 0.0, 1.0));
+				colors.push(vec4(0.0, 0.0, 0.0, 1.0)); //black
 				break;
 			case 1:
-				colors.push(vec4(1.0, 0.0, 0.0, 1.0));
+				colors.push(vec4(1.0, 0.0, 0.0, 1.0)); //red
 				break;
 			case 2:
-				colors.push(vec4(0.0, 1.0, 0.0, 1.0));
+				colors.push(vec4(0.0, 1.0, 0.0, 1.0)); //green
 				break;
    			case 3:
-				colors.push(vec4(0.0, 0.0, 1.0, 1.0));
+				colors.push(vec4(0.0, 0.0, 1.0, 1.0)); //blue
 				break;
 		default:
-			colors.push(vec4(0.0, 0.0, 0.0, 1.0));
+			colors.push(vec4(0.0, 0.0, 0.0, 1.0)); //black
 		}
 	}
 
@@ -140,7 +140,6 @@ function set_colors(gl,vectorList,colorIndex){
 }
 
 function set_vector_points(gl,vectorList,vectorType){
-
 	var vBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, flatten(vectorList), gl.STATIC_DRAW);
@@ -154,8 +153,8 @@ function set_projection(gl,extents)
 {
 	var canvas = document.getElementById('webgl');
 	gl.viewport( 0, 0,  canvas.width, canvas.height);
-	// var aspectRatio = canvas.width/canvas.height;
 	if (extents != null){
+		//if a extent is given, use that 
 		var projMatrix = ortho(extents[0],
 			extents[2],
 			extents[3],
@@ -163,9 +162,10 @@ function set_projection(gl,extents)
 			-1,
 			1);	
 	}else{
-		var viewAspectRatio = canvas.width/canvas.height;
+		//if not, assume a target width &hieght and scale the image to the aspect ratio
 		var targetWidth = 640;
 		var targetHieght = 480;
+		var viewAspectRatio = canvas.width/canvas.height;
 		var targetAspectRatio =targetWidth /targetHieght; 
 		if (viewAspectRatio>=targetAspectRatio){
 			var projMatrix = ortho(0,targetAspectRatio*targetWidth,0,targetHieght,-1,1);
@@ -184,7 +184,7 @@ function render(gl,vectorList,vectorType,extent,colorIndex){
 	// returns list
 	//
 	if (vectorList.length ==0){//there are no points to draw,
-		document.getElementById('fileContent').innerHTML = 'Rut-Roh! No points to draw, how did you get here?';
+		// document.getElementById('fileContent').innerHTML = 'Rut-Roh! No points to draw, how did you get here?';
 	}else{//if the are points to draw
 		//reset the canvas when called
 		reset_canvas(gl);
@@ -192,7 +192,7 @@ function render(gl,vectorList,vectorType,extent,colorIndex){
 		set_projection(gl,extent);
 		//set the draw point size
 		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-		gl.uniform1f(offsetLoc, 3.0);
+		gl.uniform1f(offsetLoc, 5.0);
 		// for vector in vectors, draw and color each vector point
 		for(i=0;i<vectorList.length;i++){
 			//set the vectors to be drawn
@@ -200,7 +200,7 @@ function render(gl,vectorList,vectorType,extent,colorIndex){
 			//set the colors to be painted
 			set_colors(gl,vectorList[i],colorIndex);
 			// Draw a point
-			gl.drawArrays(gl.POINTS, 0, vectorList[i].length);
+			gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length);
 		}}
 	return vectorList;
 }
@@ -209,7 +209,6 @@ function file_mode(){
 	// displays html items for the file mode
 	document.getElementById("pageMode").innerHTML = 'Mode: File';	//Display the mode
 	document.getElementById('image-file').style.display = 'block';	//Display the button
-	document.getElementById("fileContent").hidden = false;
 	document.getElementById('fileContent').innerHTML = 'Upload a file to draw!';
 	return 0;
 }
@@ -218,9 +217,16 @@ function draw_mode()
 {
 	// displays html items for the draw mode
 	document.getElementById("pageMode").innerHTML = 'Mode: Draw';	//Display the mode
-	document.getElementById("fileContent").hidden = true;		
+	document.getElementById('image-file').style.display = "none"	//hid the button
 	document.getElementById('fileContent').innerHTML = 'Click inside the box to draw points!';
 	return 1;
+}
+
+function shear_array(list0, list1, index){
+	list0.push(list1);
+	index++;
+	list0[index] = [];
+	return [list0,list1,index];
 }
 
 function main(gl,drawPoints) 
@@ -232,10 +238,11 @@ function main(gl,drawPoints)
 	var currentColor = colorList[colorIndex];
 	var vectorList = [];
 	var dataType = '';
-	var extent = null;
-	var drawPoints = [];		//draw mode points
-	var drawList = []
+	var extent = null;		//draw mode points
+	var drawList = [[]];
+	var drawIndex = 0;
 
+	// display the current color
 	document.getElementById('colorMode').innerHTML = currentColor
 
 	// Retrieve <canvas> element
@@ -262,22 +269,24 @@ function main(gl,drawPoints)
 		if (pageMode ==1)
 		{
 			var rect = canvas.getBoundingClientRect();
-			var xPos = arguments[0].clientX - rect.left;
-			var yPos = arguments[0].clientY - rect.top;
+			var xPos = 1-((arguments[0].clientX - rect.left)/canvas.width);
+			var yPos = 1-((arguments[0].clientY - rect.top)/canvas.height);
+			extent = vec4(1,1,0,0)
+			// extent = null
 			console.log('x: '+xPos+' y: '+yPos);
-			drawPoints.push(vec4(xPos, yPos,0.0,1.0));
-			if (drawPoints.length>3){
-				drawList.push(drawPoints);
-				drawPoints = [];
+
+			vectorList[drawIndex].push(vec4(xPos, yPos,0.0,1.0));
+
+			if (vectorList[drawIndex].length>99){
+				[vectorList, drawPoints, drawIndex] = shear_array(drawList, drawPoints, drawIndex)
+				// drawList.push(drawPoints);
+				// drawIndex++;
+				// drawList[drawIndex] = [];
 			}
-			if(drawList.length<1){
-				render(gl,[drawPoints],'flt',vec4(1,1,-1,-1),colorIndex,pageMode);
-			}else{
-				render(gl,[drawList],'flt',vec4(1,1,-1,-1),colorIndex,pageMode);
+			if(vectorList[0].length>1){
+				render(gl,vectorList,'flt',extent,colorIndex,pageMode);
 			}
-			
-		}
-	})
+		}})
 
 	if (!gl)
 	{
@@ -309,15 +318,15 @@ function main(gl,drawPoints)
 
 		case 'f':
 			//file mode
+			vectorList = [];
 			pageMode = file_mode();
 			break;
 
 		case 'd':
 			//draw mode
-			
+			vectorList = [[]];
 			pageMode = draw_mode();
 			break;
-
 		case 'c':
 			//changes color by indexing +1
 			colorIndex++;
@@ -326,6 +335,10 @@ function main(gl,drawPoints)
 				colorIndex = 0;
 			}
 			document.getElementById("colorMode").innerHTML = colorList[colorIndex];
+			break;
+			case 'b':
+				[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex)
+				break;
 		}
 	render(gl,vectorList,dataType,extent,colorIndex,pageMode)
 	}

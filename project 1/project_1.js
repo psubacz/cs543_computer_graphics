@@ -7,19 +7,19 @@
  */
 
 
-function upload_image()
+function display_file_data()
 {
+	//displays file name and size of image to be displayed.
 	var uploadedFile = document.getElementById("image-file");
-	var outputMessage = "";
-	var file = uploadedFile.files[0];
+	var outputMessage = "";		//clear the output message
+	var file = uploadedFile.files[0]; // sinse we are only working with one file, get the first element
 	if ('name' in file) {
 		outputMessage += "name: " + file.name + "<br>"; //display the file name
 	}
 	if ('size' in file) {
 		outputMessage += "size: " + file.size + " bytes <br>"; //display the size of the file
 	}
-	//display output to message
-	document.getElementById("fileContent").innerHTML = outputMessage;
+	document.getElementById("pageContent").innerHTML = outputMessage;	//display output to message
 }
 
 function parse_text_file(rawText){
@@ -32,20 +32,6 @@ function parse_text_file(rawText){
 
 		returns list
 	*/
-
-	//display file name and size
-	var uploadedFile = document.getElementById("image-file");
-	var outputMessage = "";
-	var file = uploadedFile.files[0];
-	if ('name' in file) {
-		outputMessage += "name: " + file.name + "<br>";
-	}
-	if ('size' in file) {
-		outputMessage += "size: " + file.size + " bytes <br>";
-	}
-	//display output to message
-	document.getElementById("fileContent").innerHTML = outputMessage; 
-
 	var extent = null
 	var dataType = '';			// data inside file, can be float of int
 	var vectors = [];			// list to hold vectors
@@ -55,23 +41,23 @@ function parse_text_file(rawText){
 	var vertexPoints = 0;		// number of points in a vertex
 	var vectorIndex = 0;		// index to count number of vectors
 	var vectorsIndex = 0;		// indexes to count vectors in list
-
 	var lines = rawText.split(/\r?\n/g);			//split the string by new lines
-	for(i=0;i<lines.length;i++){
-		var point = vec4(0.0, 0.0, 0.0, 1.0);		//points to be written too
-		var index = 0;								//indexes points written
-		var lineArray = lines[i].split(/(\s+)/);	//split the string by spaces
-		for(ii=0;ii<lineArray.length;ii++){			//for each item in the line, cast to float 
-			if (lineArray[ii].length>0){
-				var floatCast = parseFloat(lineArray[ii])	
-				if (!isNaN(floatCast))				// if not NaN, set as point
+	for(i=0;i<lines.length;i++){					//for line in lines
+		var point = vec4(0.0, 0.0, 0.0, 1.0);		//  points to be written too
+		var index = 0;								//  indexes points written
+		var lineArray = lines[i].split(/(\s+)/);	//  split the string by spaces
+		for(ii=0;ii<lineArray.length;ii++){			//  for each item in the line, cast to float 
+			if (lineArray[ii].length>0){			//		if the item exists
+				var floatCast = parseFloat(lineArray[ii])	//cast string to float
+				if (!isNaN(floatCast))				// 			if not NaN, set as point
 				{
-					point[index] = floatCast;
-					index++
+					point[index] = floatCast;		// set point to float value
+					index++							//	increment the counter
 		}}}
+	
 		if(index>0){								//if values have been set
 			if(index == 4){							// four values set mean its a extent (homogeneous unit will not change in this app)
-				var extent = point;
+				var extent = point;					// set the extents
 			}else if (index<4){					 
 				if (totalVertex == 0){				// set total number of vertices
 					totalVertex = point[0];
@@ -95,12 +81,12 @@ function parse_text_file(rawText){
 							vector=[];
 							vectorsIndex++;
 							vectorIndex = 0;
-				}}}}else{
-				// do nothing
-				console.log("Warning, line "+i+" has more than 4 items.");
+			}}}}else{
+				console.log("Warning, line "+i+" has more than 4 items.");// do nothing, log line to console 
 	}}}
 	return [vectors,dataType,extent];
 }
+
 function reset_canvas(gl){
 		// Set clear color
 		gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -183,16 +169,16 @@ function render(gl,vectorList,vectorType,extent,colorIndex,firstClick){
 	//
 	// returns list
 	//
-	if (vectorList.length ==0){//there are no points to draw,
-		// document.getElementById('fileContent').innerHTML = 'Rut-Roh! No points to draw, how did you get here?';
-	}else{//if the are points to draw
+	if (vectorList.length ==0){
+		//there are no points to draw, do nothing
+		}else{//if the are points to draw
 		//reset the canvas when called
 		reset_canvas(gl);
 		//set the orthographic projection for 2d data
 		set_projection(gl,extent);
 		//set the draw point size
 		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-		gl.uniform1f(offsetLoc, 5.0);
+		gl.uniform1f(offsetLoc, 3.0);
 		// for vector in vectors, draw and color each vector point
 		for(i=0;i<vectorList.length;i++){
 			//set the vectors to be drawn
@@ -205,7 +191,6 @@ function render(gl,vectorList,vectorType,extent,colorIndex,firstClick){
 				gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length)
 			}
 			// Draw a point
-			
 		}}
 	return vectorList;
 }
@@ -214,7 +199,7 @@ function file_mode(){
 	// displays html items for the file mode
 	document.getElementById("pageMode").innerHTML = 'Mode: File';	//Display the mode
 	document.getElementById('image-file').style.display = 'block';	//Display the button
-	document.getElementById('fileContent').innerHTML = 'Upload a file to draw!';
+	document.getElementById('pageContent').innerHTML = 'Upload a file to draw!';
 	return 0;
 }
 
@@ -223,7 +208,7 @@ function draw_mode()
 	// displays html items for the draw mode
 	document.getElementById("pageMode").innerHTML = 'Mode: Draw';	//Display the mode
 	document.getElementById('image-file').style.display = "none"	//hid the button
-	document.getElementById('fileContent').innerHTML = 'Click inside the box to draw points!';
+	document.getElementById('pageContent').innerHTML = 'Click inside the box to draw!';
 	return 1;
 }
 
@@ -259,15 +244,15 @@ function main(gl,drawPoints)
 
 	// Add the event listener to parse input file
 	document.getElementById('image-file').addEventListener('change', function() {
-		var fr = new FileReader();
-		fr.onload= function (e){
-			// resultsList = parse_text_file(fr.result);
-			[vectorList,dataType,extent] = parse_text_file(fr.result);
+		var fileReader = new FileReader();
+		fileReader.onload= function (e){
+			// resultsList = parse_text_file(fileReader.result);
+			[vectorList,dataType,extent] = parse_text_file(fileReader.result);
 			console.log('Jobs Done')
 			// var vectorsReady = true;
 			vectorList= render(gl,vectorList,dataType,extent,colorIndex,false)
 		}
-		fr.readAsText(this.files[0]);
+		fileReader.readAsText(this.files[0]);
 	}) 
 
 	// add event listener for draw mode
@@ -279,10 +264,9 @@ function main(gl,drawPoints)
 			var yPos = 1-((arguments[0].clientY - rect.top)/canvas.height);
 			extent = vec4(1,1,0,0)
 			// extent = null
+			
 			console.log('x: '+xPos+' y: '+yPos);
-
 			vectorList[drawIndex].push(vec4(xPos, yPos,0.0,1.0));
-
 			if (vectorList[drawIndex].length>99){
 				[vectorList, drawPoints, drawIndex] = shear_array(drawList, drawPoints, drawIndex);
 			}

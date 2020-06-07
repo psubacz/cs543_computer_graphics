@@ -310,27 +310,24 @@ function main(gl,drawPoints)
 			break;
 		case 'B':
 		case 'b':
-			[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex);
+			if (pageMode==1){
+				[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex);
+			}
 			break;
 		case 'Q':
 		case 'q':
 			reset_canvas(gl)
 			vectorList = [];
 			pageMode = file_mode();
-			// if (pageMode==0){
-				
-			// }else{
-			// 	pageMode = draw_mode();
-			// }
 			break;
 		default:
 			var outputMessage = 'No function set for keypress: '+key+'<br>';		//clear the output message
-			outputMessage += 'Current actions are: <br>';
-			outputMessage += "- 'F' or 'f' changes the progam mode to: File.<br>";
-			outputMessage += "- 'D' or 'd' changes the progam mode to: Draw.<br>";
-			outputMessage += "- 'C' or 'c' changes the color of items drawn to the screen.<br>";
-			outputMessage += "- 'B or 'b' breaks the the starts a new array of points to be drawn (draw mode only).<br>";
-			outputMessage += "- 'Q' or 'q' resets the page mode and clears the canvas<br>";
+			outputMessage += 'Current keypress actions are: <br>';
+			outputMessage += "-- ' F ' or ' f ' changes the progam mode to: File.<br>";
+			outputMessage += "-- ' D ' or ' d ' changes the progam mode to: Draw.<br>";
+			outputMessage += "-- ' C ' or ' c ' changes the color of items drawn to the screen.<br>";
+			outputMessage += "-- ' B ' or ' b ' breaks the the starts a new array of points to be drawn (draw mode only).<br>";
+			outputMessage += "-- ' Q ' or ' q ' resets the page mode and clears the canvas<br>";
 			document.getElementById('pageContent').innerHTML = outputMessage;
 		}
 	render(gl,vectorList,dataType,extent,colorIndex)

@@ -6,12 +6,7 @@
  * @author Peter Subacz
  */
 
-function draw_mode()
-{
-	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
-	document.getElementById('image-file').style.display = 'none';	//Display the button
-	// await ;
-}
+
 
 function reset_canvas(gl){
 		// Set clear color
@@ -201,6 +196,13 @@ function file_mode(gl,vectorList,vectorType,extent,colorIndex){
 			// Draw a point
 			gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length);
 		}}}
+
+function draw_mode()
+{
+	document.getElementById("pageMode").innerHTML = 'Draw Mode';	//Display the mode
+	document.getElementById('image-file').style.display = 'none';	//Display the button
+	// await ;
+}
 
 function main() 
 {

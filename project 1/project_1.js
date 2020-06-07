@@ -137,18 +137,14 @@ function set_vector_points(gl,vectorList,vectorType){
 
 function set_projection(gl,extents)
 {
-	var canvas = document.getElementById('webgl');
-	gl.viewport( 0, 0,  canvas.width, canvas.height);
-	if (extents != null){
-		//if a extent is given, use that 
-		var projMatrix = ortho(extents[0],
-			extents[2],
-			extents[3],
-			extents[1],
-			-1,
-			1);	
-	}else{
-		//if not, assume a target width &hieght and scale the image to the aspect ratio
+	/*
+		set the matrix projection, extent and aspect ratio to view image
+	*/
+	var canvas = document.getElementById('webgl');	//get the canvas in the webpage
+	gl.viewport( 0, 0,  canvas.width, canvas.height);//set the viewport into the virtual world
+	if (extents != null){	//if a extent is given, use that 
+		var projMatrix = ortho(extents[0],extents[2],extents[3],extents[1],-1,1);	
+	}else{	//if not, assume a target width &hieght and scale the image to the aspect ratio
 		var targetWidth = 640;
 		var targetHieght = 480;
 		var viewAspectRatio = canvas.width/canvas.height;
@@ -159,39 +155,31 @@ function set_projection(gl,extents)
 			var projMatrix = ortho(0,targetWidth,0,targetAspectRatio*targetHieght,-1,1);
 		}
 	}
-	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix");
-	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));
+	var projMatrixLoc = gl.getUniformLocation(program, "projMatrix"); //grab the location is memory
+	gl.uniformMatrix4fv(projMatrixLoc,false,flatten(projMatrix));	//construct the uniform matrix
 }
 
-function render(gl,vectorList,vectorType,extent,colorIndex,firstClick){
-	//
-	//	Renders passed data to the canvas. 
-	//
-	// returns list
-	//
+function render(gl,vectorList,vectorType,extent,colorIndex){
+	/*
+		Render the array of array of points to a screen, 
+		if there is a single point, draw it as points,
+		if there are mulitple points, draw a lines.
+	*/
 	if (vectorList.length ==0){
 		//there are no points to draw, do nothing
 		}else{//if the are points to draw
-		//reset the canvas when called
-		reset_canvas(gl);
-		//set the orthographic projection for 2d data
-		set_projection(gl,extent);
-		//set the draw point size
-		var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-		gl.uniform1f(offsetLoc, 3.0);
-		// for vector in vectors, draw and color each vector point
-		for(i=0;i<vectorList.length;i++){
-			//set the vectors to be drawn
-			set_vector_points(gl,vectorList[i],vectorType);
-			//set the colors to be painted
-			set_colors(gl,vectorList[i],colorIndex);
-			if (vectorList[i].length<=1){
+		reset_canvas(gl);				//reset the canvas when called
+		set_projection(gl,extent);		//set the orthographic projection for 2d data
+		var offsetLoc = gl.getUniformLocation(program, "vPointSize");		//set the draw point size
+		gl.uniform1f(offsetLoc, 3.0);		// for vector in vectors, draw and color each vector point
+		for(i=0;i<vectorList.length;i++){	// for each array in arries
+			set_vector_points(gl,vectorList[i],vectorType);//set the vectors to be drawns
+			set_colors(gl,vectorList[i],colorIndex);//set the colors to be painted
+			if (vectorList[i].length<=1){ // if there is only one point to draw as a point
 				gl.drawArrays(gl.POINTS, 0, vectorList[i].length);
-			}else{
+			}else{	//else draw as a line strip
 				gl.drawArrays(gl.LINE_STRIP, 0, vectorList[i].length)
-			}
-			// Draw a point
-		}}
+			}}}
 	return vectorList;
 }
 
@@ -213,6 +201,7 @@ function draw_mode()
 }
 
 function shear_array(list0, list1, index){
+	//shear the array and start a new subarray
 	list0.push(list1);
 	index++;
 	list0[index] = [];
@@ -229,12 +218,10 @@ function main(gl,drawPoints)
 	var vectorList = [];
 	var dataType = '';
 	var extent = null;		//draw mode points
-	var drawList = [[]];
 	var drawIndex = 0;
-	var firstClick = true;
 
 	// display the current color
-	document.getElementById('colorMode').innerHTML = currentColor
+	document.getElementById('colorMode').innerHTML = currentColor;
 
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');
@@ -259,19 +246,15 @@ function main(gl,drawPoints)
 	canvas.addEventListener("click", function() {
 		if (pageMode ==1)
 		{
-			var rect = canvas.getBoundingClientRect();
-			var xPos = 1-((arguments[0].clientX - rect.left)/canvas.width);
-			var yPos = 1-((arguments[0].clientY - rect.top)/canvas.height);
-			extent = vec4(1,1,0,0)
-			// extent = null
-			
-			console.log('x: '+xPos+' y: '+yPos);
-			vectorList[drawIndex].push(vec4(xPos, yPos,0.0,1.0));
-			if (vectorList[drawIndex].length>99){
-				[vectorList, drawPoints, drawIndex] = shear_array(drawList, drawPoints, drawIndex);
+			var rect = canvas.getBoundingClientRect();//get bounding box of the canvas
+			var xPos = 1-((arguments[0].clientX - rect.left)/canvas.width); //cast the x coordinate into webgl coordinate
+			var yPos = 1-((arguments[0].clientY - rect.top)/canvas.height); //cast the y coordinate into webgl coordinate
+			extent = vec4(1,1,0,0)	//set the default extent
+			vectorList[drawIndex].push(vec4(xPos, yPos,0.0,1.0)); // add the point to a array
+			if (vectorList[drawIndex].length>99){ // if the array is bigger that 100 points, start a new array
+				[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex);
 			}
-			render(gl,vectorList,'flt',extent,colorIndex,firstClick);
-			firstClick = false;
+			render(gl,vectorList,'flt',extent,colorIndex); // render points to a screen
 		}})
 
 	if (!gl)
@@ -287,11 +270,13 @@ function main(gl,drawPoints)
 	// We tell WebGL which shader program to execute.
 	gl.useProgram(program);
 
+	//on key presses, do change the colors or modes
 	window.onkeypress = function(event)
 	{
 		var key = event.key;
 		switch(key)
 		{
+		case 'A':
 		case 'a':
 			//Note that calling an event automatically clears the canvas. This has to do with how
 			//WebGL manages the memory buffer. See the following URLs for more information on this:
@@ -301,19 +286,19 @@ function main(gl,drawPoints)
 			gl.drawArrays(gl.TRIANGLES, 0, points.length);
 			// window.alert('Key pressed is ' + key);
 			break;
-
+		case 'F':
 		case 'f':
 			//file mode
 			vectorList = [];
 			pageMode = file_mode();
 			break;
-
+		case 'D':
 		case 'd':
 			//draw mode
-			firstClick = true;
 			vectorList = [[]];
 			pageMode = draw_mode();
 			break;
+		case 'C':
 		case 'c':
 			//changes color by indexing +1
 			colorIndex++;
@@ -323,10 +308,31 @@ function main(gl,drawPoints)
 			}
 			document.getElementById("colorMode").innerHTML = colorList[colorIndex];
 			break;
-			case 'b':
-				[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex)
-				break;
+		case 'B':
+		case 'b':
+			[vectorList, drawPoints, drawIndex] = shear_array(vectorList, drawPoints, drawIndex);
+			break;
+		case 'Q':
+		case 'q':
+			reset_canvas(gl)
+			vectorList = [];
+			pageMode = file_mode();
+			// if (pageMode==0){
+				
+			// }else{
+			// 	pageMode = draw_mode();
+			// }
+			break;
+		default:
+			var outputMessage = 'No function set for keypress: '+key+'<br>';		//clear the output message
+			outputMessage += 'Current actions are: <br>';
+			outputMessage += "- 'F' or 'f' changes the progam mode to: File.<br>";
+			outputMessage += "- 'D' or 'd' changes the progam mode to: Draw.<br>";
+			outputMessage += "- 'C' or 'c' changes the color of items drawn to the screen.<br>";
+			outputMessage += "- 'B or 'b' breaks the the starts a new array of points to be drawn (draw mode only).<br>";
+			outputMessage += "- 'Q' or 'q' resets the page mode and clears the canvas<br>";
+			document.getElementById('pageContent').innerHTML = outputMessage;
 		}
-	render(gl,vectorList,dataType,extent,colorIndex,firstClick)
+	render(gl,vectorList,dataType,extent,colorIndex)
 	}
 }

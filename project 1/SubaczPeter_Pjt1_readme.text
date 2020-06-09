@@ -1,0 +1,35 @@
+Subacz Project 1 Read Me
+
+These folder contain:
+    - project_1.html
+    - project_1.js
+    - SubaczPeter_Pjt1_readme.txt (this file)
+    - files (directory)
+    - lib (directory)
+
+To open the project, open the html in a firefox or chrome web browser.
+
+There are two modes that can be operated in File and Draw. The program 
+    defualts to file mode.
+
+-File Mode: Press the f key to enter file mode. This is the default mode
+    the page loads. To operate this mode, press the browse button to 
+    find a .dat file to be drawn. the page will ingest the file and 
+    extract the proper data to be rendered. If a new files is uploaded,
+    the canvas will be ereased and the new file will be drawn
+-Draw Mode: Press the d key to enter draw mode. This mode allows a user
+    to click inside the canvas to draw a point or lines (series of 
+    points) to the screen. pressing the b key will break the current
+    lines being drawn to screen.
+
+Colors can be changed by pressing the c key, the current colors are:
+    black,red,blue,green. this system will rotate between these colors. 
+
+The system can be reset by pressing the q key to clear the canvas and
+    return to file mode
+
+
+
+
+
+

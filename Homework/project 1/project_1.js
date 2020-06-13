@@ -233,10 +233,11 @@ function main(gl,drawPoints)
 	document.getElementById('image-file').addEventListener('change', function() {
 		var fileReader = new FileReader();
 		fileReader.onload= function (e){
-
-			// [vectorList,dataType,extent] = parse_text_file(fileReader.result);
+			// resultsList = parse_text_file(fileReader.result);
+			[vectorList,dataType,extent] = parse_text_file(fileReader.result);
 			console.log('Jobs Done')
-			// vectorList= render(gl,vectorList,dataType,extent,colorIndex,false)
+			// var vectorsReady = true;
+			vectorList= render(gl,vectorList,dataType,extent,colorIndex,false)
 		}
 		fileReader.readAsText(this.files[0]);
 	}) 

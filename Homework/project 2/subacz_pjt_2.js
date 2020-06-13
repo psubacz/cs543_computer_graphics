@@ -15,7 +15,7 @@ var points;
 var colors;
 var theta = 0;
 var alpha = 0;
-function display_file_metadata(numberVertices,numberPolygons){
+function display_file_metadata(plyDataType,numberVertices,numberPolygons){
 	/*
 		This function displays metadata parsed from the a textfile at the end.
 		 this infomation is displayed belwo the broswe button. The infomation 
@@ -29,23 +29,30 @@ function display_file_metadata(numberVertices,numberPolygons){
 	var outputMessage = "";		//clear the output message
 	var file = uploadedFile.files[0]; // sinse we are only working with one file, get the first element
 	if ('name' in file) {
+		outputMessage += "------- Metadata -------<br>"; //display the file name
 		outputMessage += "File name: " + file.name + "<br>"; //display the file name
 	}
 	if ('size' in file) {
 		outputMessage += "File size: " + file.size + " bytes <br>"; //display the size of the file
 	}
-	if (fileType != null){
-		outputMessage += "Number of Vertices: " + file.size + " bytes <br>";
-		outputMessage += "File size: " + file.size + " bytes <br>";
+	if (plyDataType == true){
+		outputMessage += "Number of Vertices: " + numberVertices + "<br>";
+		outputMessage += "Number of Polygons: " + numberPolygons + "<br>";
 	}else{
-
+		outputMessage += "Error! File header data type not set. Exiting parsing...<br>"; //display the file name
 	}
 	document.getElementById("pageContent").innerHTML = outputMessage;	//display output to mess
 }
 
-function parse_ply_file(rawFile){
+function parse_ply_file(rawText){
 	/*
-		ply
+		This parser will process raw text uploaded to the application. The parser will
+		 split the text by new lines and then by white space to process each word inside
+		 raw text. The parser will read in the header information if header fails, the 
+		 program will return an error message to the screen. If it passes the the 
+		 coordinates of the vertices will be parsed as vec4s and the polygons will be 
+		 processed in turn as vec4 as required.
+
 		format ascii 1.0
 		element vertex 8
 		property float32 x
@@ -54,14 +61,95 @@ function parse_ply_file(rawFile){
 		element face 12
 		property list uint8 int32 vertex_indices
 		end_header
+
+		returns [list,list]
 	*/
+
+	var plyDataType = false;			// 
+	var vertexCoordsList = [];		// list of vertex cordinates 
+	var polygonIndexList = [];		// list of polygon indexs within the vertexCoordsList.
+	var endHeader = false;
+	var numberVertices = 0;
+	var numberPolygons = 0;
+
+
+
+
+	var vectors = [];			// list to hold vectors
+	var vector = [];			// list of dump vector points 
+	var creatingVertex = false;	// bool to create vertices
+	var totalVertex = 0;		// total number of vertices
+	var vertexPoints = 0;		// number of points in a vertex
+	var vectorIndex = 0;		// index to count number of vectors
+	var vectorsIndex = 0;		// indexes to count vectors in list
 
 	
 
-
-	display_file_metadata(numberVertices,numberPolygons);
-	return [];
-}
+	var lines = rawText.split(/\r?\n/g);			//split the string by new lines
+	for(i=0;i<lines.length;i++){					//for line in lines
+		var point = vec4(0.0, 0.0, 0.0, 1.0);		//  points to be written too
+		var index = 0;								//  indexes points written
+		var lineArray = lines[i].split(/(\s+)/);	//  split the string by spaces
+		console.log(lineArray)
+		for(ii=0;ii<lineArray.length;ii++){			//  for each item in the line, cast to float 
+			if (lineArray[ii].length>0){			//		if the item exists(skip empty lines)
+				//	parse the header
+				switch(lineArray[ii]){
+					case 'ply':
+						plyDataType = true;
+						break;
+					case 'vertex':
+						numberVertices = parseInt(lineArray[lineArray.length-1]);
+						break;
+					case 'face':
+						numberPolygons = parseInt(lineArray[lineArray.length-1]);
+						break;
+					case 'end_header':
+						endHeader = true;
+						break;
+					default:
+						//do nothing
+					}
+				//parse the file content
+				}else{									
+					var floatCast = parseFloat(lineArray[ii])	//cast string to float
+					if (!isNaN(floatCast))				// 			if not NaN, set as point
+					{
+						point[index] = floatCast;		// set point to float value
+						index++							//	increment the counter
+					}
+				}
+			}
+		}
+	
+		if (endHeader==true && plyDataType == true){
+			// if(index>0){								//if values have been set
+			// 	if(index == 4){							// four values set mean its a extent (homogeneous unit will not change in this app)
+			// 		var extent = point;					// set the extents
+			// 	}else if (index<4){					 
+			// 		if (totalVertex == 0){				// set total number of vertices
+			// 			totalVertex = point[0];
+			// 		}else if (vertexPoints == 0 && creatingVertex == false){	// being creating a vertex
+			// 			creatingVertex = true;
+			// 			vertexPoints = point[0];
+			// 		}else if (creatingVertex = true){			//while creating a vertes, set the points
+			// 			if (vectorIndex < vertexPoints){
+			// 				vector[vectorIndex] = point;
+			// 				vectorIndex++;
+			// 				if (vectorIndex >= vertexPoints){	//if we have looped throught the points in a vertex, reset the creation values
+			// 					creatingVertex = false;
+			// 					vertexPoints = 0;
+			// 					vectors[vectorsIndex] = vector;
+			// 					vector=[];
+			// 					vectorsIndex++;
+			// 					vectorIndex = 0;
+			// 	}}}}else{
+			// 		console.log("Warning, line "+i+" has more than 4 items.");// do nothing, log line to console 
+			// }}
+		}
+	display_file_metadata(plyDataType,numberVertices,numberPolygons);
+	return [vertexCoordsList,polygonIndexList];
+	}
 
 var vertexList = []
 

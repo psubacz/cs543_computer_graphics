@@ -1,0 +1,5 @@
+Lectures/*
+*.zip
+*.pdf
+project 1/.idea/*
+lib/*

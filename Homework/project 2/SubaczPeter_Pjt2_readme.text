@@ -1,0 +1,52 @@
+Subacz Project 1 Read Me
+
+These folder contain:
+    - project_2.html
+    - project_2.js
+    - SubaczPeter_Pjt2_readme.txt (this file)
+    - cs4731_pjt2_ply_files (directory)
+    - lib (directory)
+
+To open the project, open the html in a firefox or chrome web browser.
+
+The project will default to the pulsating mode. 
+
+During ingest the parser will attempt to find the ply header tag, number 
+    of vertices, number of polygons, and end_header tag, If any of these 
+    are missing from the header, a warning or error message will be displayed.
+    
+    Error messages will occur if ply or end_header tags are missing from header.
+        These are required for the parser to operate and the files will need 
+        manual fixing before processing. 
+
+    Warning messages will occur if processed vertices and polygons do not
+        match what is listed in the header. The program will continue with 
+        the warning displayed. 
+
+     tag is missing from header.
+    find a .dat file to be drawn. the page will ingest the file and 
+    extract the proper data to be rendered. If a new files is uploaded,
+    the canvas will be ereased and the new file will be drawn.
+
+There are two modes that can be operated in File and Draw. The program 
+    defualts to file mode.
+
+-File Mode: Press the f key to enter file mode. This is the default mode
+    the page loads. To operate this mode, press the browse button to 
+    find a .dat file to be drawn. the page will ingest the file and 
+    extract the proper data to be rendered. If a new files is uploaded,
+    the canvas will be ereased and the new file will be drawn.
+-Draw Mode: Press the d key to enter draw mode. This mode allows a user
+    to click inside the canvas to draw a point or lines (series of 
+    points) to the screen. pressing the b key will break the current
+    lines being drawn to screen.
+
+Colors can be changed by pressing the c key, the current colors are:
+    black,red,blue,green. this system will rotate between these colors. 
+
+The system can be reset by pressing the q key to clear the canvas and
+    return to file mode
+
+
+This project was developed and tested in firefox. 
+

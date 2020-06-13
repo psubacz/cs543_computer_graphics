@@ -15,14 +15,18 @@ var points;
 var colors;
 var theta = 0;
 var alpha = 0;
-function display_file_metadata(plyDataType,numberVertices,numberPolygons){
+
+function display_file_metadata(plyDataType,endHeader,numberVertices,numberPolygons,
+		processedVertices,processedPolygons){
 	/*
 		This function displays metadata parsed from the a textfile at the end.
 		 this infomation is displayed belwo the broswe button. The infomation 
 		 shown in the file name, file size, number of vertices, and number of 
-		 polygones in the file. 
+		 polygones in the file.
 
-		Returns null
+		    Error messages will occur if ply or end_header tags are missing from header.
+
+		warning messages will fire if mismatch between header and processed data. 
 	*/
 
 	var uploadedFile = document.getElementById("ply-file");
@@ -35,11 +39,20 @@ function display_file_metadata(plyDataType,numberVertices,numberPolygons){
 	if ('size' in file) {
 		outputMessage += "File size: " + file.size + " bytes <br>"; //display the size of the file
 	}
-	if (plyDataType == true){
-		outputMessage += "Number of Vertices: " + numberVertices + "<br>";
-		outputMessage += "Number of Polygons: " + numberPolygons + "<br>";
-	}else{
-		outputMessage += "Error! File header data type not set. Exiting parsing...<br>"; //display the file name
+
+	if (plyDataType == true && numberVertices == processedVertices && numberPolygons==processedPolygons){
+		outputMessage += "Number of Vertices: " + numberVertices +", Number of vertices processed: "+processedVertices+ "<br>";
+		outputMessage += "Number of Polygons: " + numberPolygons +", Number of polygons processed: "+processedPolygons+ "<br>";
+	}else if (plyDataType == false){
+		outputMessage += "Error! File header 'ply' tag not set. Add the 'ply' tag to the header to continue with this file. Exiting parsing...<br>"; //no ply txt string in header
+	}else if (endHeader == false){
+		outputMessage += "Error! File header 'end_header' tag not set. Add the 'end_header' tag to the header to continue with this file. Exiting parsing...<br>"; //no ply txt string in header
+	}
+	if (numberVertices != processedVertices && (plyDataType !=false && endHeader != false)){
+		outputMessage += "Warning! Mismatch in file header and data. Header lists: " +numberVertices+ " vertices and processed: " +processedVertices+" vertices. <br>"; 
+	}
+	if (numberPolygons != processedPolygons && (plyDataType !=false && endHeader != false)){
+		outputMessage += "Warning! Mismatch in file header and data. Header lists: " +numberPolygons+ " vertices and processed: " +processedPolygons+" vertices. <br>"; 
 	}
 	document.getElementById("pageContent").innerHTML = outputMessage;	//display output to mess
 }
@@ -51,39 +64,35 @@ function parse_ply_file(rawText){
 		 raw text. The parser will read in the header information if header fails, the 
 		 program will return an error message to the screen. If it passes the the 
 		 coordinates of the vertices will be parsed as vec4s and the polygons will be 
-		 processed in turn as vec4 as required.
+		 processed in turn as vec4 as required. if the index is only moves 3 times the
+		 parser assumes 
 
-		format ascii 1.0
-		element vertex 8
+		file format
+		---
+		ply											***Required tag
+		format ascii 1.0			
+		element vertex 8							
 		property float32 x
 		property float32 y
 		property float32 z
 		element face 12
 		property list uint8 int32 vertex_indices
-		end_header
+		end_header									***Required tag
+		
+		-0.5 -0.5 -0.5 	//vertex format
+		3 3 2 1			//polygon format
+		---
 
 		returns [list,list]
 	*/
-
-	var plyDataType = false;			// 
 	var vertexCoordsList = [];		// list of vertex cordinates 
 	var polygonIndexList = [];		// list of polygon indexs within the vertexCoordsList.
-	var endHeader = false;
-	var numberVertices = 0;
-	var numberPolygons = 0;
-
-
-
-
-	var vectors = [];			// list to hold vectors
-	var vector = [];			// list of dump vector points 
-	var creatingVertex = false;	// bool to create vertices
-	var totalVertex = 0;		// total number of vertices
-	var vertexPoints = 0;		// number of points in a vertex
-	var vectorIndex = 0;		// index to count number of vectors
-	var vectorsIndex = 0;		// indexes to count vectors in list
-
-	
+	var endHeader = false;			// bool end of header marker
+	var plyDataType = false;		// bool ply designation present in file header
+	var numberVertices = 0;			// int number for vertices metadata
+	var numberPolygons = 0;			// int number for polygons metadata
+	var vertexIndex = 0;			// int index of vertices
+	var polygonIndex = 0;			// int index of polygon
 
 	var lines = rawText.split(/\r?\n/g);			//split the string by new lines
 	for(i=0;i<lines.length;i++){					//for line in lines
@@ -93,23 +102,24 @@ function parse_ply_file(rawText){
 		console.log(lineArray)
 		for(ii=0;ii<lineArray.length;ii++){			//  for each item in the line, cast to float 
 			if (lineArray[ii].length>0){			//		if the item exists(skip empty lines)
-				//	parse the header
-				switch(lineArray[ii]){
-					case 'ply':
-						plyDataType = true;
-						break;
-					case 'vertex':
-						numberVertices = parseInt(lineArray[lineArray.length-1]);
-						break;
-					case 'face':
-						numberPolygons = parseInt(lineArray[lineArray.length-1]);
-						break;
-					case 'end_header':
-						endHeader = true;
-						break;
-					default:
-						//do nothing
-					}
+				if (endHeader==false){
+					//	parse the header
+					switch(lineArray[ii]){
+						case 'ply':
+							plyDataType = true;
+							break;
+						case 'vertex':
+							numberVertices = parseInt(lineArray[lineArray.length-1]);
+							break;
+						case 'face':
+							numberPolygons = parseInt(lineArray[lineArray.length-1]);
+							break;
+						case 'end_header':
+							endHeader = true;
+							break;
+						default:
+							//do nothing
+						}
 				//parse the file content
 				}else{									
 					var floatCast = parseFloat(lineArray[ii])	//cast string to float
@@ -123,31 +133,22 @@ function parse_ply_file(rawText){
 		}
 	
 		if (endHeader==true && plyDataType == true){
-			// if(index>0){								//if values have been set
-			// 	if(index == 4){							// four values set mean its a extent (homogeneous unit will not change in this app)
-			// 		var extent = point;					// set the extents
-			// 	}else if (index<4){					 
-			// 		if (totalVertex == 0){				// set total number of vertices
-			// 			totalVertex = point[0];
-			// 		}else if (vertexPoints == 0 && creatingVertex == false){	// being creating a vertex
-			// 			creatingVertex = true;
-			// 			vertexPoints = point[0];
-			// 		}else if (creatingVertex = true){			//while creating a vertes, set the points
-			// 			if (vectorIndex < vertexPoints){
-			// 				vector[vectorIndex] = point;
-			// 				vectorIndex++;
-			// 				if (vectorIndex >= vertexPoints){	//if we have looped throught the points in a vertex, reset the creation values
-			// 					creatingVertex = false;
-			// 					vertexPoints = 0;
-			// 					vectors[vectorsIndex] = vector;
-			// 					vector=[];
-			// 					vectorsIndex++;
-			// 					vectorIndex = 0;
-			// 	}}}}else{
-			// 		console.log("Warning, line "+i+" has more than 4 items.");// do nothing, log line to console 
-			// }}
+			if(index>0){								//if values have been set
+				if(index == 3){							// four values set mean its a extent (homogeneous unit will not change in this app)
+					vertexCoordsList[vertexIndex] = point;
+					// vertexCoordsList.push(point);
+					vertexIndex++;
+				}else if (index == 4){	
+					numberPolygons[polygonIndex] = point;				 
+					// numberPolygons.push(point);				// set total number of vertices
+					polygonIndex++;
+				}else{
+					console.log("Warning, line "+i+" has more than 4 items.");// do nothing, log line to console 
+				}
+			}
 		}
-	display_file_metadata(plyDataType,numberVertices,numberPolygons);
+	}	
+	display_file_metadata(plyDataType,endHeader,numberVertices,numberPolygons,vertexIndex,polygonIndex);
 	return [vertexCoordsList,polygonIndexList];
 	}
 
@@ -166,7 +167,7 @@ function main()
 			// vectorList= render(gl,vectorList,dataType,extent,colorIndex,false)
 		}
 		fileReader.readAsText(this.files[0]);
-	}) 
+	})
 
 	// Retrieve <canvas> element
 	var canvas = document.getElementById('webgl');

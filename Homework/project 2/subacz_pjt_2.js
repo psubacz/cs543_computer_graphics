@@ -15,6 +15,7 @@ var points;
 var colors;
 var theta = 0;
 var alpha = 0;
+var id;
 
 function display_file_metadata(plyDataType,endHeader,numberVertices,numberPolygons,
 		processedVertices,processedPolygons){
@@ -57,7 +58,7 @@ function display_file_metadata(plyDataType,endHeader,numberVertices,numberPolygo
 	document.getElementById("pageContent").innerHTML = outputMessage;	//display output to mess
 }
 
-function parse_ply_file(rawText){
+function parse_ply_file(vertexCoordsList,polygonIndexList,rawText){
 	/*
 		This parser will process raw text uploaded to the application. The parser will
 		 split the text by new lines and then by white space to process each word inside
@@ -84,9 +85,9 @@ function parse_ply_file(rawText){
 		---
 
 		returns [list,list]
-	*/
-	var vertexCoordsList = [];		// list of vertex cordinates 
-	var polygonIndexList = [];		// list of polygon indexs within the vertexCoordsList.
+	*/		
+	vertexCoordsList = [];			// clear the vertex list
+	polygonIndexList = [];			// clear the polygon list
 	var endHeader = false;			// bool end of header marker
 	var plyDataType = false;		// bool ply designation present in file header
 	var numberVertices = 0;			// int number for vertices metadata
@@ -99,11 +100,9 @@ function parse_ply_file(rawText){
 		var point = vec4(0.0, 0.0, 0.0, 1.0);		//  points to be written too
 		var index = 0;								//  indexes points written
 		var lineArray = lines[i].split(/(\s+)/);	//  split the string by spaces
-		console.log(lineArray)
 		for(ii=0;ii<lineArray.length;ii++){			//  for each item in the line, cast to float 
 			if (lineArray[ii].length>0){			//		if the item exists(skip empty lines)
-				if (endHeader==false){
-					//	parse the header
+				if (endHeader==false){			//	parse the header
 					switch(lineArray[ii]){
 						case 'ply':
 							plyDataType = true;
@@ -120,10 +119,9 @@ function parse_ply_file(rawText){
 						default:
 							//do nothing
 						}
-				//parse the file content
-				}else{									
+				}else{							//parse the file content						
 					var floatCast = parseFloat(lineArray[ii])	//cast string to float
-					if (!isNaN(floatCast))				// 			if not NaN, set as point
+					if (!isNaN(floatCast))				// 	if not NaN, set as point
 					{
 						point[index] = floatCast;		// set point to float value
 						index++							//	increment the counter
@@ -139,7 +137,7 @@ function parse_ply_file(rawText){
 					// vertexCoordsList.push(point);
 					vertexIndex++;
 				}else if (index == 4){	
-					numberPolygons[polygonIndex] = point;				 
+					polygonIndexList[polygonIndex] = point;				 
 					// numberPolygons.push(point);				// set total number of vertices
 					polygonIndex++;
 				}else{
@@ -150,21 +148,162 @@ function parse_ply_file(rawText){
 	}	
 	display_file_metadata(plyDataType,endHeader,numberVertices,numberPolygons,vertexIndex,polygonIndex);
 	return [vertexCoordsList,polygonIndexList];
-	}
+}
 
-var vertexList = []
+function quad(a, b, c, d)
+{
+    var vertices = [
+        vec4( -0.5, -0.5,  0.5, 1.0 ),
+        vec4( -0.5,  0.5,  0.5, 1.0 ),
+        vec4(  0.5,  0.5,  0.5, 1.0 ),
+        vec4(  0.5, -0.5,  0.5, 1.0 ),
+        vec4( -0.5, -0.5, -0.5, 1.0 ),
+        vec4( -0.5,  0.5, -0.5, 1.0 ),
+        vec4(  0.5,  0.5, -0.5, 1.0 ),
+        vec4(  0.5, -0.5, -0.5, 1.0 )
+    ];
+
+    var vertexColors = [
+        [ 0.0, 0.0, 0.0, 1.0 ],  // black
+        [ 1.0, 0.0, 0.0, 1.0 ],  // red
+        [ 1.0, 1.0, 0.0, 1.0 ],  // yellow
+        [ 0.0, 1.0, 0.0, 1.0 ],  // green
+        [ 0.0, 0.0, 1.0, 1.0 ],  // blue
+        [ 1.0, 0.0, 1.0, 1.0 ],  // magenta
+        [ 0.0, 1.0, 1.0, 1.0 ],  // cyan
+        [ 1.0, 1.0, 1.0, 1.0 ]   // white
+    ];
+
+    // We need to parition the quad into two triangles in order for
+    // WebGL to be able to render it.  In this case, we create two
+    // triangles from the quad indices
+
+    //vertex color assigned by the index of the vertex
+
+    var indices = [ a, b, c, a, c, d ];
+
+    for ( var i = 0; i < indices.length; ++i ) {
+        points.push( vertices[indices[i]] );
+        //colors.push( vertexColors[indices[i]] );
+
+        // for solid colored faces use
+        colors.push(vertexColors[a]);
+
+    }
+}
+
+function render() {
+	var rotMatrix = rotateX(0);
+	var translateMatrix = translate(0, 0, 0);
+	var ctMatrix = mult(translateMatrix, rotMatrix);
+
+	theta -= 0.5;
+	alpha += 0.005;
+
+	var eye = vec3(-4.0, -1.0, 9.0);
+	var at = vec3(1.0, 1.0, -1.0);
+	var up = vec3(0.0, 1.0, 0.0);
+
+	var viewMatrix = lookAt(eye, at, up);
+
+
+	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+
+	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
+	gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
+
+    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+	gl.drawArrays(gl.TRIANGLES, 0, points.length);
+
+	id = requestAnimationFrame(render);
+
+}
+
+function update_state_output(key,breathing,disp,x,y,z,roll){
+	msg = "";
+	msg += "Mode: "+key+'<br>';
+	msg += "-------------------<br>";
+	msg +="Breathing: "+breathing+'<br>';
+	msg +="Displacement: "+disp+'<br>';
+	msg += "-------------------<br>";
+	msg += "Mode: "+key+'<br>';
+	msg += "X: "+x+'<br>';
+	msg += "Y: "+y+'<br>';
+	msg += "Z: "+z+'<br>';
+	msg += "Roll:"+ roll+'<br>';
+
+	document.getElementById("meshState").innerHTML =msg;
+}
+
+function process_keypress(theKey){
+	//on key presses, do change the colors or modes
+	switch(theKey)
+	{
+	case 'X':
+	case 'x':
+		break;
+
+	case 'C':
+	case 'c':
+		break;
+
+	case 'Y':
+	case 'y':
+		break;
+
+	case 'U':
+	case 'u':
+		break;
+
+	case 'Z':
+	case 'z':
+		break;
+
+	case 'A':
+	case 'a':
+		break;
+
+	case 'R':
+	case 'r':
+		break;
+
+		
+	case 'B':
+	case 'b':
+		break;
+
+	default:
+		var outputMessage = 'No function set for keypress: '+theKey+'<br>';		//clear the output message
+		outputMessage += 'Current keypress actions are: <br>';
+		outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the positive x direction. <br>";
+		outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the negative x direction.<br>";
+		outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the positive y direction.<br>";
+		outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the negative y direction.<br>";
+		outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the positive z direction. <br>";
+		outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the negative z direction.<br>";
+		outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an X-roll about it's CURRENT position.<br>";
+		outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
+		document.getElementById('pageContent').innerHTML = outputMessage;
+	}
+}
+
+
+
 
 function main() 
 {
+	update_state_output(0,true,0,0,0,0,0); // update the status box with current status
+
+	var vertexCoordsList = [];		// list of vertex cordinates 
+	var polygonIndexList = [];		// list of polygon indexs within the vertexCoordsList.
+
 	// Add the event listener to parse input file
 	document.getElementById('ply-file').addEventListener('change', function() {
 		var fileReader = new FileReader();
 		fileReader.onload= function (e){
-			vertexList = parse_ply_file(fileReader.result);
-			// [vectorList,dataType,extent] = parse_text_file(fileReader.result);
-			console.log('Jobs Done')
-			// var vectorsReady = true;
-			// vectorList= render(gl,vectorList,dataType,extent,colorIndex,false)
+			[vertexCoordsList,polygonIndexList] = parse_ply_file(vertexCoordsList,polygonIndexList,fileReader.result);
 		}
 		fileReader.readAsText(this.files[0]);
 	})
@@ -275,78 +414,12 @@ function main()
 
 	//Necessary for animation
 	render();
-
+	
+	window.onkeypress = function(event)
+	{
+		process_keypress(event.key)
+	}
+	
 }
 
-var id;
 
-function render() {
-	var rotMatrix = rotateX(0);
-	var translateMatrix = translate(0, 0, 0);
-	var ctMatrix = mult(translateMatrix, rotMatrix);
-
-	theta -= 0.5;
-	alpha += 0.005;
-
-	var eye = vec3(-4.0, -1.0, 9.0);
-	var at = vec3(1.0, 1.0, -1.0);
-	var up = vec3(0.0, 1.0, 0.0);
-
-	var viewMatrix = lookAt(eye, at, up);
-
-
-	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-
-	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
-	gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
-
-    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-	gl.drawArrays(gl.TRIANGLES, 0, points.length);
-
-	id = requestAnimationFrame(render);
-
-}
-
-function quad(a, b, c, d)
-{
-    var vertices = [
-        vec4( -0.5, -0.5,  0.5, 1.0 ),
-        vec4( -0.5,  0.5,  0.5, 1.0 ),
-        vec4(  0.5,  0.5,  0.5, 1.0 ),
-        vec4(  0.5, -0.5,  0.5, 1.0 ),
-        vec4( -0.5, -0.5, -0.5, 1.0 ),
-        vec4( -0.5,  0.5, -0.5, 1.0 ),
-        vec4(  0.5,  0.5, -0.5, 1.0 ),
-        vec4(  0.5, -0.5, -0.5, 1.0 )
-    ];
-
-    var vertexColors = [
-        [ 0.0, 0.0, 0.0, 1.0 ],  // black
-        [ 1.0, 0.0, 0.0, 1.0 ],  // red
-        [ 1.0, 1.0, 0.0, 1.0 ],  // yellow
-        [ 0.0, 1.0, 0.0, 1.0 ],  // green
-        [ 0.0, 0.0, 1.0, 1.0 ],  // blue
-        [ 1.0, 0.0, 1.0, 1.0 ],  // magenta
-        [ 0.0, 1.0, 1.0, 1.0 ],  // cyan
-        [ 1.0, 1.0, 1.0, 1.0 ]   // white
-    ];
-
-    // We need to parition the quad into two triangles in order for
-    // WebGL to be able to render it.  In this case, we create two
-    // triangles from the quad indices
-
-    //vertex color assigned by the index of the vertex
-
-    var indices = [ a, b, c, a, c, d ];
-
-    for ( var i = 0; i < indices.length; ++i ) {
-        points.push( vertices[indices[i]] );
-        //colors.push( vertexColors[indices[i]] );
-
-        // for solid colored faces use
-        colors.push(vertexColors[a]);
-
-    }
-}

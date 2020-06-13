@@ -2,8 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Subacz Project 2</title>
+	<title>Subacz Project 2</title>
+	<style>
+		div.relative {
+			position: relative;
+			left: 410px;
+			bottom: 400px;
+			width: 180px;
+			height: 200px;
+			border: 2px solid #000000;
+		}
+	</style>
  
+	<style>
+		button {
+			position: relative;
+			left: 0px;
+			bottom: 0px;
+		}
+	</style>
 	<script id="vshader" type="x-shader/x-vertex">
 	
 	attribute vec4 vPosition;	
@@ -37,12 +54,19 @@
 
   </head>
  
-  <body onload="main()">
+  <body onload="main()">	
 	<p id="pageMode"></p> 
+
     <canvas id="webgl" width="400" height="400">
     	Please use a browser that supports the "canvas" tag.
 	</canvas>
-	<input id="ply-file" type="file" accept=".ply">
+
+	<input id="ply-file" type="file" accept=".ply" >
+
+	<div id="meshState" class="relative"> </div> 
+
+
+
 	<p id="pageContent"></p>
 
   </body>

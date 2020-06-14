@@ -12,21 +12,48 @@ var gl;
 var program;
 var points;
 var colors;
-var theta = 0;
+
+var theta = 0; 	//degrees x rotation
+var beta = 0;	//degrees y rotation
+var gamma =0;	//degrees z rotation
 var alpha = 0;
+
 var id;
 var key = '';
+
 var breathing = true;
 var x = 0.0;
 var y = 0.0;
 var z = 0.0;
+
 var roll = 0.0;
 var extents;	
 var polygons;
 var canvas;
+
 var pi = 3.14159265359;
-var zNear;
-var zFar;
+var zNear = 0.1;
+var zFar =100;
+
+var avg_x =1;
+var avg_y =1;
+var avg_z =1;
+
+var pulse = false;
+var rotPosX = false;
+var rotNegX = false;
+var rotPosY = false;
+var rotNegY = false;
+var rotPosZ = false;
+var rotNegZ = false;
+var transPosX = false;
+var transPosY = false;
+var transPosZ = false;
+var transNegX = false;
+var transNegY = false;
+var transNegZ = false;
+
+// breathing, disp, x, y, z, rotPosX
 
 function radToDeg(rad) {
     return rad * 180 / Math.PI;
@@ -48,7 +75,7 @@ function dot_product(vector1, vector2) {
 
 
 function main() {
-	update_state_output(breathing, 0, 0, 0, 0, 0); // update the status box with current status
+	update_state_output(); // update the status box with current status
 
 	// Add the event listener to parse input file
 	document.getElementById('ply-file').addEventListener('change', function () {
@@ -100,7 +127,7 @@ function main() {
 	polygons = [];
 
 	render();
-
+	process_keypress(' ');
 	window.onkeypress = function (event) {
 		process_keypress(event.key)
 	}
@@ -118,7 +145,6 @@ function draw_polygons(polygons){
 
 	set_perspective_view();
 	set_point_size();
-	
 	// For polygon in polygons, extract each point and draw them
 	for (var i = 0; i < polygons.length; ++i) {
 		for(var ii = 0; ii <polygons[i][0].length; ++ii) {
@@ -170,9 +196,9 @@ function set_perspective_view(){
 		var dy=0;
 		var dz=0;
 		if (extents.length){
-			var avg_x = (extents[3]+extents[0])/2.0;
-			var avg_y = (extents[4]+extents[1])/2.0;
-			var avg_z = (extents[5]+extents[2])/2.0;
+			avg_x = (extents[3]+extents[0])/2.0;
+			avg_y = (extents[4]+extents[1])/2.0;
+			avg_z = (extents[5]+extents[2])/2.0;
 			//calcualte the radius 
 			dx = extents[3] - avg_x;
 			dy = extents[4] - avg_y;
@@ -183,7 +209,6 @@ function set_perspective_view(){
 		}
 		var fieldOfView = 60;					//assumed to be 90 for now
 		var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-	
 
 		var fDistance = r / Math.tan(fieldOfView); 
 	
@@ -204,26 +229,14 @@ function set_perspective_view(){
 		// dy = 1 - avg_y;
 		// dz = 1 - avg_z;
 
-		var dot_x=dot_product([1,0,0], [avg_x,avg_y,avg_z]);
-		var dot_y=dot_product([0,1,0], [avg_x,avg_y,avg_z]);
-		var dot_z=dot_product([0,0,1], [avg_x,avg_y,avg_z]);
-
-		// camera transforms
-		var rotMatrix = rotateX(-90);
-		
-		// translate the model to the center of the screen
-		var translateMatrix = translate(-avg_x, -avg_y, -avg_z);
-
-		var ctMatrix = mult(translateMatrix, rotMatrix);
-	
-		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+		// var dot_x=dot_product([1,0,0], [avg_x,avg_y,avg_z]);
+		// var dot_y=dot_product([0,1,0], [avg_x,avg_y,avg_z]);
+		// var dot_z=dot_product([0,0,1], [avg_x,avg_y,avg_z]);
 	
 		var eye = vec3(0.0, 0.0, zNear*1.5); 	// position at camera at XYZ
 		var at  = vec3(0.0, 0.0, 0.0);		// center point of what is being looked at XYZ
 		var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
 		var viewMatrix = lookAt(eye, at, up);
-	
 		var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
 		gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
 }
@@ -241,75 +254,288 @@ There's no one right way to do this, so please pick a method that makes logical 
 Once you know your camera position, you can calculate your FOV using your camera position, your extents, and some trigonometry. 
 Take a look at the image below:
 	*/
+	// camera transforms
+	if (rotPosX){
+		theta -= 0.5;
+	}else if (rotNegX){
+		theta += 0.5;
+	}else{
+		//do nothing
+	}
+	if (rotPosY){
+		beta -= 0.5;
+	}else if (rotNegY){
+		beta += 0.5;
+	}else{
+		//do nothing
+	}
+	if (rotPosZ){
+		gamma -= 0.5;
+	}else if (rotNegZ){
+		gamma += 0.5;
+	}else{
+		//do nothing
+	}
+	var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
+
+
+	// translate the model to the center of the screen
+	var translateMatrix = translate(-avg_x, -avg_y, -avg_z);
+
+	var ctMatrix = mult(translateMatrix, rotMatrix);
+	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+
 
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	gl.drawArrays(gl.LINES, 0, points.length);
-	// id = requestAnimationFrame(render);
+	id = requestAnimationFrame(render);
 
 }
 
-function update_state_output(breathing, disp, x, y, z, roll) {
+function update_state_output() {
 	msg = "";
-	msg += " Breathing: " + breathing + '<br>';
-	msg += " Normal Disp: " + disp + '<br>';
+	if (pulse == true){
+		msg += " Breathing: On<br>";
+	}else{
+		msg += " Breathing: Off <br>";
+	}
+
 	msg += " -------------------<br>";
-	msg += " X: " + x + '<br>';
-	msg += " Y: " + y + '<br>';
-	msg += " Z: " + z + '<br>';
-	msg += " Roll:" + roll + '<br>';
+	if (transPosX == true){
+		msg += " X: +<br>";
+	}else if (transNegX == true){
+		msg += " X: -<br>";
+	}else{
+		msg += " X: <br>"
+	}
+
+	if (transPosY == true){
+		msg += " Y: +<br>";
+	}else if (transNegY == true){
+		msg += " Y: -<br>";
+	}else{
+		msg += " Y: <br>"
+	}
+
+	if (transPosZ == true){
+		msg += " Z: +<br>";
+	}else if (transNegZ == true){
+		msg += " Z: -<br>";
+	}else{
+		msg += " Z: <br>";
+	}
+
+	msg += " -------------------<br>";
+	//rotations
+	if (rotPosX == true){
+		msg += " X Rotation: +<br>";
+	}else if (rotNegX == true){
+		msg += " X Rotation: -<br>";
+	}else{
+		msg += " X Rotation: <br>";
+	}
+	if (rotPosY == true){
+		msg += " Y Rotation: +<br>";
+	}else if (rotNegY == true){
+		msg += " Y Rotation: -<br>";
+	}else{
+		msg += " Y Rotation: <br>";
+	}
+	if (rotPosZ == true){
+		msg += " Z Rotation: +<br>";
+	}else if (rotNegZ == true){
+		msg += " Z Rotation: -<br>";
+	}else{
+		msg += " Z Rotation: <br>";
+	}
 	document.getElementById("meshState").innerHTML = msg;
 }
 
 function process_keypress(theKey) {
+	// function to toggle modes,x
+
 	//on key presses, do change the colors or modes
 	switch (theKey) {
 		case 'X':
 		case 'x':
+			// Translate your wireframe in the + x direction.
+			if (transPosX == false){
+				transPosX = true;
+				transNegX = false;
+			}else{
+				transPosX = false;
+			}
 			break;
-
 		case 'C':
 		case 'c':
+			//Translate your wireframe in the - x direction
+			if (transNegX == false){
+				transPosX = false;
+				transNegX = true;		//turn on
+			}else{
+				transNegX = false;
+			}
 			break;
 
 		case 'Y':
 		case 'y':
+			//Translate your wireframe in the + y direction.
+			if (transPosY == false){
+				transPosY = true;//turn on
+				transNegY = false;//turn off
+			}else{
+				transPosY = false;
+			}
 			break;
-
 		case 'U':
 		case 'u':
+			//Translate your wireframe in the - y direction
+			if (transNegY == false){
+				transPosY = false;
+				transNegY = true;
+			}else{
+				transNegY = false;
+			}
 			break;
 
 		case 'Z':
 		case 'z':
-			break;
+			//Translate your wireframe in the + z direction.
+			if (transPosZ == false){
+				transPosZ = true;
+				transNegZ = false;
+			}else{
+				transPosZ = false;
+			}
 
+			break;
 		case 'A':
 		case 'a':
+			//Translate your wireframe in the - z direction.
+			if (transNegZ == false){
+				transPosZ = false;
+				transNegZ = true;
+			}else{
+				transNegZ = false;
+			}
+
 			break;
 
 		case 'R':
 		case 'r':
+			//Rotate your wireframe in an +X-roll about it's CURRENT position.
+			if (rotPosX==false){
+				rotNegX = false;
+				rotPosX = true;
+			}else{
+				rotPosX = false;
+			}
+			break;
+		case 'T':
+		case 't':
+			//Rotate your wireframe in an -X-roll about it's CURRENT position.
+			if (rotNegX == false){
+				rotNegX = true;
+				rotPosX = false;
+			}else{
+				rotNegX = false;
+			}
 			break;
 
+		case 'O':
+		case 'o':
+			//Rotate your wireframe in an +Y-roll about it's CURRENT position.
+			if (rotPosY == false){
+				rotNegY = false;
+				rotPosY = true;	
+			}else{
+				rotPosY = false;
+			}
+			break;
+
+		case 'P':
+		case 'p':
+			//Rotate your wireframe in an -Y-roll about it's CURRENT position.
+			if(rotNegY == false){
+				rotNegY = true;
+				rotPosY = false;
+			}else{
+				rotNegY = false;
+			}
+			break;
+
+		case 'L':
+		case 'l':
+			//Rotate your wireframe in an +Z-roll about it's CURRENT position.
+			if(rotNegZ == false){
+				rotNegZ = true;
+				rotPosZ = false;
+			}else{
+				rotNegZ == false;
+			}
+			break;
+		case 'K':
+		case 'k':
+			//Rotate your wireframe in an -Z-roll about it's CURRENT position.
+			rotNegZ = false;
+			rotPosZ = true;
+			break;
 
 		case 'B':
 		case 'b':
+			if (pulse == false){//turn on
+				pulse = true;				
+			}else{//turn off
+				pulse = false;				
+			}
+			//Toggle pulsing meshes
 			break;
-
+		case 'Q':
+		case 'q':
+			//stop all actions
+			//disable translation
+			transPosX = false;
+			transNegX = false;
+			transPosY = false;
+			transNegY = false;
+			transPosZ = false;
+			transNegZ = false;
+			//disable rotations
+			rotNegX = false;
+			rotPosX = false;
+			rotNegY = false;
+			rotPosY = false;
+			rotNegZ = false;
+			rotPosZ = false;
+			//reset translations
+			theta = 0;
+			beta = 0;
+			gramma = 0;
+			break;		
 		default:
 			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message
 			outputMessage += 'Current keypress actions are: <br>';
-			outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the positive x direction. <br>";
-			outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the negative x direction.<br>";
-			outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the positive y direction.<br>";
-			outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the negative y direction.<br>";
-			outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the positive z direction. <br>";
-			outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the negative z direction.<br>";
-			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an X-roll about it's CURRENT position.<br>";
+			outputMessage += '-Translations: <br>';
+			outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the + x direction. <br>";
+			outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the - x direction.<br>";
+			outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the + y direction.<br>";
+			outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the - y direction.<br>";
+			outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the + z direction. <br>";
+			outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the - z direction.<br>";
+			outputMessage += '-Rotations: <br>';
+			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an + X-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' T ' or ' T ' Rotate your wireframe in an - X-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' O ' or ' o ' Rotate your wireframe in an + Y-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' P ' or ' p ' Rotate your wireframe in an - Y-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' K ' or ' k ' Rotate your wireframe in an + Z-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' L ' or ' l ' Rotate your wireframe in an - Z-roll about it's CURRENT position.<br>";
+			outputMessage += '-Pulse <br>';
 			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
 			document.getElementById('pageContent').innerHTML = outputMessage;
 	}
+	update_state_output();
 }
 
 function display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons,

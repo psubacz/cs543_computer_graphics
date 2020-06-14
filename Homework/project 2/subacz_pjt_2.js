@@ -23,7 +23,15 @@ var z = 0.0;
 var roll = 0.0;
 var extents;	
 var polygons;
+var canvas;
+var pi = 3.14159265359;
 
+function degToRad(deg){
+	return deg*pi/180
+}
+
+var cameraAngleRadians = degToRad(0);
+var fieldOfViewRadians = degToRad(60);
 
 function main() {
 	update_state_output(breathing, 0, 0, 0, 0, 0); // update the status box with current status
@@ -32,21 +40,23 @@ function main() {
 	document.getElementById('ply-file').addEventListener('change', function () {
 		var fileReader = new FileReader();
 		fileReader.onload = function (e) {
+			points = [];
+			colors = [];
+			extents = [];
+			polygons = [];
 			var vertexCoordsList = []; // list of vertex cordinates 
 			var polygonIndexList = []; // list of polygon indexs within the vertexCoordsList.
 			extents = [];
 			[vertexCoordsList, polygonIndexList, extents] = parse_ply_file(vertexCoordsList, polygonIndexList, fileReader.result);
 			var polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
-			set_vector_points(gl,polygons);
-			set_point_size(gl);
-			set_color_points(gl);
-			set_projection(gl);
+			draw_polygons(polygons);
+
 		}
 		fileReader.readAsText(this.files[0]);
 	})
 
 	// Retrieve <canvas> element
-	var canvas = document.getElementById('webgl');
+	canvas = document.getElementById('webgl');
 
 	// Get the rendering context for WebGL
 	gl = WebGLUtils.setupWebGL(canvas, undefined);
@@ -70,31 +80,12 @@ function main() {
 	//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
 	gl.viewport(0, 0, canvas.width, canvas.height);
 
-	/**********************************
-	* Points, Lines, and Fill
-	**********************************/
-
-	/*** VERTEX DATA ***/
-	//Define the positions of our points
-	//Note how points are in a range from 0 to 1
 	points = [];
 	colors = [];
 	extents = [];
 	polygons = [];
 
-	quad(1, 0, 3, 2);
-	quad(2, 3, 7, 6);
-	quad(3, 0, 4, 7);
-	quad(6, 5, 1, 2);
-	quad(4, 5, 6, 7);
-	quad(5, 4, 0, 1);
-
-	set_vector_points(gl,null);
-	set_point_size(gl);
-	set_color_points(gl);
-	set_projection(gl);
-
-	//Necessary for animation
+	set_projection();
 	render();
 
 	window.onkeypress = function (event) {
@@ -102,74 +93,155 @@ function main() {
 	}
 }
 
-function set_projection(gl){
-	//This is how we handle extents
-	// var thisProj = ortho(-1, 1, -1, 1, -1, 1);
+function draw_polygons(polygons){
+	// For polygon in polygons, extract each point and draw them
+	for (var i = 0; i < polygons.length; ++i) {
+		for(var ii = 0; ii < 3; ++ii) {
+			// set points 
+			points.push(polygons[i][0][ii]);
+			// for solid colored faces use
+			colors.push(polygons[i][1][ii]);
+	}}
+	//
+	set_vector_points();
+	set_point_size();
+	set_color_points();
+	set_projection();
+	render();
+}
 
-	var fovy = 30;
-	var thisProj = perspective(fovy, 1, .1, 100);
+function set_vector_points(){
+	//
+	var vBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
+	//
+	var vPosition = gl.getAttribLocation(program, "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);
+}
+
+function set_point_size(){
+	//Specify the vertex size
+	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
+	gl.uniform1f(offsetLoc, 5.0);
+}
+
+function set_color_points(){
+	//
+	var cBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+	//
+	var vColor = gl.getAttribLocation(program, "vColor");
+	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vColor);
+}
+
+function set_projection(){
+	//This is how we handle extents
+	var thisProj = ortho(-2.5, 1.5, -2.5, 1.5, -1.5, 1.5);
+
+	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    var zNear = 1;
+    var zFar = 10;
+	// var thisProj = perspective(fieldOfViewRadians, aspect, zNear, zFar);
 
 	var projMatrix = gl.getUniformLocation(program, 'projMatrix');
 	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
 
 	// Set clear color
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
 	gl.enable(gl.DEPTH_TEST);
 }
 
-function set_color_points(gl){
-	var cBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-	var vColor = gl.getAttribLocation(program, "vColor");
-	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vColor);
+function render() {
+	var rotMatrix = rotateX(0);
+	var translateMatrix = translate(0, 0, 0);
+	var ctMatrix = mult(translateMatrix, rotMatrix);
+
+	theta -= 0.5;
+	alpha += 0.005;
+
+	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+
+	var eye = vec3(0.0, 1.0, 2.0);
+	var at  = vec3(1.0, 1.0, 1.0);
+	var up  = vec3(0.0, 1.0, 0.0);
+	var viewMatrix = lookAt(eye, at, up);
+	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
+	gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
+
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+	gl.drawArrays(gl.LINES, 0, points.length);
+
+	id = requestAnimationFrame(render);
 
 }
 
-function set_point_size(gl){
-	//Specify the vertex size
-	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-	gl.uniform1f(offsetLoc, 10.0);
+function update_state_output(breathing, disp, x, y, z, roll) {
+	msg = "";
+	msg += " Breathing: " + breathing + '<br>';
+	msg += " Normal Disp: " + disp + '<br>';
+	msg += " -------------------<br>";
+	msg += " X: " + x + '<br>';
+	msg += " Y: " + y + '<br>';
+	msg += " Z: " + z + '<br>';
+	msg += " Roll:" + roll + '<br>';
+	document.getElementById("meshState").innerHTML = msg;
 }
 
-function set_vector_points(gl,polygons){
-	/*
-		//Create the buffer object
+function process_keypress(theKey) {
+	//on key presses, do change the colors or modes
+	switch (theKey) {
+		case 'X':
+		case 'x':
+			break;
 
-		//Bind the buffer object to a target
-		//The target tells WebGL what type of data the buffer object contains, 
-		//  allowing it to deal with the contents correctly
-		//gl.ARRAY_BUFFER - specifies that the buffer object contains vertex data
-	
-		//Allocate storage and write data to the buffer
-		//Write the data specified by the second parameter into the buffer object
-		//  bound to the first parameter
-		//We use flatten because the data must be a single array of ints, uints, or floats (float32 or float64)
-		//This is a typed array, and we can't use push() or pop() with it
-		
-		//The last parameter specifies a hint about how the program is going to use the data
-		//  stored in the buffer object. This hint helps WebGL optimize performance but will not stop your
-		//  program from working if you get it wrong.
-		//STATIC_DRAW - buffer object data will be specified once and used many times to draw shapes
-		//DYNAMIC_DRAW - buffer object data will be specified repeatedly and used many times to draw shapes
+		case 'C':
+		case 'c':
+			break;
 
-		//Get the location of the shader's vPosition attribute in the GPU's memory
+		case 'Y':
+		case 'y':
+			break;
 
-		//Specifies how shader should pull the data
-		//A hidden part of gl.vertexAttribPointer is that it binds the current ARRAY_BUFFER to the attribute.
-		//In other words now this attribute is bound to vColor. That means we're free to bind something else
-		// to the ARRAY_BUFFER bind point. The attribute will continue to use vPosition.
-		
-		// Turns the attribute on
-	*/
-	var vBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
-	var vPosition = gl.getAttribLocation(program, "vPosition");
-	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vPosition);
+		case 'U':
+		case 'u':
+			break;
+
+		case 'Z':
+		case 'z':
+			break;
+
+		case 'A':
+		case 'a':
+			break;
+
+		case 'R':
+		case 'r':
+			break;
+
+
+		case 'B':
+		case 'b':
+			break;
+
+		default:
+			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message
+			outputMessage += 'Current keypress actions are: <br>';
+			outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the positive x direction. <br>";
+			outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the negative x direction.<br>";
+			outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the positive y direction.<br>";
+			outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the negative y direction.<br>";
+			outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the positive z direction. <br>";
+			outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the negative z direction.<br>";
+			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an X-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
+			document.getElementById('pageContent').innerHTML = outputMessage;
+	}
 }
 
 function display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons,
@@ -383,140 +455,6 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		polygon[2] = normal_newell_method(polygon[0]);
 		polygons[i] = polygon;
 	}
-	console.log(polygons);
+	// console.log(polygons);
 	return polygons;
 }
-
-function quad(a, b, c, d) {
-	var vertices = [
-		vec4(-0.5, -0.5, 0.5, 1.0),
-		vec4(-0.5, 0.5, 0.5, 1.0),
-		vec4(0.5, 0.5, 0.5, 1.0),
-		vec4(0.5, -0.5, 0.5, 1.0),
-		vec4(-0.5, -0.5, -0.5, 1.0),
-		vec4(-0.5, 0.5, -0.5, 1.0),
-		vec4(0.5, 0.5, -0.5, 1.0),
-		vec4(0.5, -0.5, -0.5, 1.0)
-	];
-
-	var vertexColors = [
-		[0.0, 0.0, 0.0, 1.0],  // black
-		[1.0, 0.0, 0.0, 1.0],  // red
-		[1.0, 1.0, 0.0, 1.0],  // yellow
-		[0.0, 1.0, 0.0, 1.0],  // green
-		[0.0, 0.0, 1.0, 1.0],  // blue
-		[1.0, 0.0, 1.0, 1.0],  // magenta
-		[0.0, 1.0, 1.0, 1.0],  // cyan
-		[1.0, 1.0, 1.0, 1.0]   // white
-	];
-
-	// We need to parition the quad into two triangles in order for
-	// WebGL to be able to render it.  In this case, we create two
-	// triangles from the quad indices
-
-	//vertex color assigned by the index of the vertex
-
-	var indices = [a, b, c, a, c, d];
-
-	for (var i = 0; i < indices.length; ++i) {
-		points.push(vertices[indices[i]]);
-
-		// for solid colored faces use
-		colors.push(vertexColors[a]);
-
-	}
-}
-
-function render() {
-	var rotMatrix = rotateX(0);
-	var translateMatrix = translate(0, 0, 0);
-	var ctMatrix = mult(translateMatrix, rotMatrix);
-
-	theta -= 0.5;
-	alpha += 0.005;
-
-	var eye = vec3(0.0, 0.0, 0.0);
-	var at = vec3(1.0, 1.0, 1.0);
-	var up = vec3(0.0, 1.0, 0.0);
-
-	var viewMatrix = lookAt(eye, at, up);
-
-
-	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-
-	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
-	gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
-
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-	gl.drawArrays(gl.TRIANGLES, 0, points.length);
-
-	id = requestAnimationFrame(render);
-
-}
-
-function update_state_output(breathing, disp, x, y, z, roll) {
-	msg = "";
-	msg += " Breathing: " + breathing + '<br>';
-	msg += " Normal Disp: " + disp + '<br>';
-	msg += " -------------------<br>";
-	msg += " X: " + x + '<br>';
-	msg += " Y: " + y + '<br>';
-	msg += " Z: " + z + '<br>';
-	msg += " Roll:" + roll + '<br>';
-	document.getElementById("meshState").innerHTML = msg;
-}
-
-function process_keypress(theKey) {
-	//on key presses, do change the colors or modes
-	switch (theKey) {
-		case 'X':
-		case 'x':
-			break;
-
-		case 'C':
-		case 'c':
-			break;
-
-		case 'Y':
-		case 'y':
-			break;
-
-		case 'U':
-		case 'u':
-			break;
-
-		case 'Z':
-		case 'z':
-			break;
-
-		case 'A':
-		case 'a':
-			break;
-
-		case 'R':
-		case 'r':
-			break;
-
-
-		case 'B':
-		case 'b':
-			break;
-
-		default:
-			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message
-			outputMessage += 'Current keypress actions are: <br>';
-			outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the positive x direction. <br>";
-			outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the negative x direction.<br>";
-			outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the positive y direction.<br>";
-			outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the negative y direction.<br>";
-			outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the positive z direction. <br>";
-			outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the negative z direction.<br>";
-			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an X-roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
-			document.getElementById('pageContent').innerHTML = outputMessage;
-	}
-}
-
-

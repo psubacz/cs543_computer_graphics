@@ -25,13 +25,27 @@ var extents;
 var polygons;
 var canvas;
 var pi = 3.14159265359;
+var zNear;
+var zFar;
 
-function degToRad(deg){
-	return deg*pi/180
-}
+function radToDeg(rad) {
+    return rad * 180 / Math.PI;
+  }
 
-var cameraAngleRadians = degToRad(0);
-var fieldOfViewRadians = degToRad(60);
+function degToRad(deg) {
+    return deg * Math.PI / 180;
+  }
+  
+function dot_product(vector1, vector2) {
+	//https://www.w3resource.com/javascript-exercises/javascript-basic-exercise-108.php
+	var result = 0;
+	for (var i = 0; i < 3; i++) {
+	  result += vector1[i] * vector2[i];
+	}
+	return result;
+  }
+
+
 
 function main() {
 	update_state_output(breathing, 0, 0, 0, 0, 0); // update the status box with current status
@@ -85,7 +99,6 @@ function main() {
 	extents = [];
 	polygons = [];
 
-	set_projection();
 	render();
 
 	window.onkeypress = function (event) {
@@ -93,21 +106,32 @@ function main() {
 	}
 }
 
-function draw_polygons(polygons){
+function draw_polygons(polygons){   
+	// Clear the canvas AND the depth buffer.
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+	// Turn on culling. By default backfacing triangles
+    // will be culled.
+    // gl.enable(gl.CULL_FACE);
+    // Enable the depth buffer
+	gl.enable(gl.DEPTH_TEST);
+
+	set_perspective_view();
+	set_point_size();
+	
 	// For polygon in polygons, extract each point and draw them
 	for (var i = 0; i < polygons.length; ++i) {
-		for(var ii = 0; ii < 3; ++ii) {
+		for(var ii = 0; ii <polygons[i][0].length; ++ii) {
+			// console.log(polygons[i][0][ii]);
 			// set points 
 			points.push(polygons[i][0][ii]);
 			// for solid colored faces use
 			colors.push(polygons[i][1][ii]);
-	}}
-	//
-	set_vector_points();
-	set_point_size();
-	set_color_points();
-	set_projection();
-	render();
+		}
+		set_vector_points();
+		set_color_points();
+		render();
+	}
 }
 
 function set_vector_points(){
@@ -124,7 +148,7 @@ function set_vector_points(){
 function set_point_size(){
 	//Specify the vertex size
 	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-	gl.uniform1f(offsetLoc, 5.0);
+	gl.uniform1f(offsetLoc, 2.0);
 }
 
 function set_color_points(){
@@ -138,46 +162,90 @@ function set_color_points(){
 	gl.enableVertexAttribArray(vColor);
 }
 
-function set_projection(){
-	//This is how we handle extents
-	var thisProj = ortho(-2.5, 1.5, -2.5, 1.5, -1.5, 1.5);
+function set_perspective_view(){
+	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
 
-	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    var zNear = 1;
-    var zFar = 10;
-	// var thisProj = perspective(fieldOfViewRadians, aspect, zNear, zFar);
+		// use the extents to make a bounding sphere
+		var dx=0;
+		var dy=0;
+		var dz=0;
+		if (extents.length){
+			var avg_x = (extents[3]+extents[0])/2.0;
+			var avg_y = (extents[4]+extents[1])/2.0;
+			var avg_z = (extents[5]+extents[2])/2.0;
+			//calcualte the radius 
+			dx = extents[3] - avg_x;
+			dy = extents[4] - avg_y;
+			dz = extents[5] - avg_z;
+			var r = Math.sqrt((dx)*(dx) + (dy)*(dy) + (dz)*(dz));
+		}else{
+			r=1;
+		}
+		var fieldOfView = 60;					//assumed to be 90 for now
+		var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+	
 
-	var projMatrix = gl.getUniformLocation(program, 'projMatrix');
-	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
+		var fDistance = r / Math.tan(fieldOfView); 
+	
+		zNear = fDistance - r;
+		zFar = fDistance + r;
+		
+		var thisProj = perspective(fieldOfView, aspect, zNear, zFar);
+	
+		var projMatrix = gl.getUniformLocation(program, 'projMatrix');
+		gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
+	
+		// Set clear color
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-	// Set clear color
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-	gl.enable(gl.DEPTH_TEST);
+		// CENTER THE OBJECT around the origin
+
+		// dx = 1 - avg_x;
+		// dy = 1 - avg_y;
+		// dz = 1 - avg_z;
+
+		var dot_x=dot_product([1,0,0], [avg_x,avg_y,avg_z]);
+		var dot_y=dot_product([0,1,0], [avg_x,avg_y,avg_z]);
+		var dot_z=dot_product([0,0,1], [avg_x,avg_y,avg_z]);
+
+		// camera transforms
+		var rotMatrix = rotateX(-90);
+		
+		// translate the model to the center of the screen
+		var translateMatrix = translate(-avg_x, -avg_y, -avg_z);
+
+		var ctMatrix = mult(translateMatrix, rotMatrix);
+	
+		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+	
+		var eye = vec3(0.0, 0.0, zNear*1.5); 	// position at camera at XYZ
+		var at  = vec3(0.0, 0.0, 0.0);		// center point of what is being looked at XYZ
+		var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
+		var viewMatrix = lookAt(eye, at, up);
+	
+		var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
+		gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
 }
 
 function render() {
-	var rotMatrix = rotateX(0);
-	var translateMatrix = translate(0, 0, 0);
-	var ctMatrix = mult(translateMatrix, rotMatrix);
+	/*
+	Q. How do I calculate my FOV and camera (eye) position?
 
-	theta -= 0.5;
-	alpha += 0.005;
+A: Once you know your bounding box (your extents), you can use those to help you calculate FOV and camera location.
+ Since the perspective projection function also takes in an aspect ratio, your model should not get distorted.
 
-	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+For your camera (eye) position, think about how you can use your extents to help you determine how far back you should pull your camera from the mesh. 
+There's no one right way to do this, so please pick a method that makes logical sense to you.
 
-	var eye = vec3(0.0, 1.0, 2.0);
-	var at  = vec3(1.0, 1.0, 1.0);
-	var up  = vec3(0.0, 1.0, 0.0);
-	var viewMatrix = lookAt(eye, at, up);
-	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
-	gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
+Once you know your camera position, you can calculate your FOV using your camera position, your extents, and some trigonometry. 
+Take a look at the image below:
+	*/
 
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	gl.drawArrays(gl.LINES, 0, points.length);
-
-	id = requestAnimationFrame(render);
+	// id = requestAnimationFrame(render);
 
 }
 
@@ -445,14 +513,25 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		 returns [polygons]
 	*/
 
+
+	
+
 	var polygons = [];
 	for(i=0;i<polygonIndexList.length;i++){
 		var polygon = [[],[],[]];
-		for (ii=1;ii<4;ii++){
-			polygon[0][ii-1] = vertexCoordsList[polygonIndexList[i][ii]]
-			polygon[1][ii-1]= [1.0, 1.0, 1.0, 1.0]   // white
+		var a = polygonIndexList[i][1]
+		var b = polygonIndexList[i][2]
+		var c = polygonIndexList[i][3]
+
+		var indices = [ a, b, c, a, c, b ];
+		for ( var ii = 0; ii < indices.length; ++ii ){
+			polygon[0][ii] = vertexCoordsList[indices[ii]];
+			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   // white
 		}
+
+
 		polygon[2] = normal_newell_method(polygon[0]);
+		polygon[1][3]= [1.0, 1.0, 1.0, 1.0]   // white
 		polygons[i] = polygon;
 	}
 	// console.log(polygons);

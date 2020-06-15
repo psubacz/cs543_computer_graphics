@@ -5,9 +5,11 @@
  * @author Joshua Cuneo
  * @author Peter Subacz
  * 
- * 
+ * using multiple draw calls  example:https://webglfundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
  */
 
+
+// global variables
 var gl;
 var program;
 var points;
@@ -16,7 +18,19 @@ var colors;
 var theta = 0; 	//degrees x rotation
 var beta = 0;	//degrees y rotation
 var gamma =0;	//degrees z rotation
-var alpha = 0;
+
+var dx=0;		//units x translation
+var dy=0;		//units y translation
+var dz=0;		//units z translation
+
+var n = vec4(0.0,0.0,0.0,1.0);
+var c = 0.01;
+var px = 0;		//pulse x 
+var py = 0;		//pulse y 
+var pz = 0;		//pulse z
+var t =0;
+var disp =0.0001;
+// var delay = 1/100;
 
 var id;
 var key = '';
@@ -55,14 +69,6 @@ var transNegZ = false;
 
 // breathing, disp, x, y, z, rotPosX
 
-function radToDeg(rad) {
-    return rad * 180 / Math.PI;
-  }
-
-function degToRad(deg) {
-    return deg * Math.PI / 180;
-  }
-  
 function dot_product(vector1, vector2) {
 	//https://www.w3resource.com/javascript-exercises/javascript-basic-exercise-108.php
 	var result = 0;
@@ -71,9 +77,7 @@ function dot_product(vector1, vector2) {
 	}
 	return result;
   }
-
-
-
+  
 function main() {
 	update_state_output(); // update the status box with current status
 
@@ -126,55 +130,99 @@ function main() {
 	extents = [];
 	polygons = [];
 
-	render();
+	render([]);
 	process_keypress(' ');
 	window.onkeypress = function (event) {
 		process_keypress(event.key)
 	}
 }
-
 function draw_polygons(polygons){   
+	// We tell WebGL which shader program to execute.
+	gl.useProgram(program);
+
+    // Tell WebGL how to convert from clip space to pixels
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	// Clear the canvas AND the depth buffer.
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
 	// Turn on culling. By default backfacing triangles
     // will be culled.
-    // gl.enable(gl.CULL_FACE);
+    gl.enable(gl.CULL_FACE);
     // Enable the depth buffer
 	gl.enable(gl.DEPTH_TEST);
 
 	set_perspective_view();
 	set_point_size();
 	// For polygon in polygons, extract each point and draw them
-	for (var i = 0; i < polygons.length; ++i) {
+	for(var i = 0; i < polygons.length; ++i) {
+	// for(var i = 0; i < 5; i++) {
+		var poly = [];
+		colors = [];
 		for(var ii = 0; ii <polygons[i][0].length; ++ii) {
-			// console.log(polygons[i][0][ii]);
 			// set points 
-			points.push(polygons[i][0][ii]);
+			poly.push(polygons[i][0][ii]);
 			// for solid colored faces use
 			colors.push(polygons[i][1][ii]);
 		}
-		set_vector_points();
+		n = polygons[i][2]
+		set_vector_points(poly);
 		set_color_points();
-		render();
+		render(poly);
 	}
 }
+function set_perspective_view(){
+	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
 
-function set_vector_points(){
-	//
-	var vBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
-	//
-	var vPosition = gl.getAttribLocation(program, "vPosition");
-	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vPosition);
+	// use the extents to make a bounding sphere
+	if (extents.length){
+		avg_x = (extents[3]+extents[0])/2.0;
+		avg_y = (extents[4]+extents[1])/2.0;
+		avg_z = (extents[5]+extents[2])/2.0;
+		//calcualte the radius 
+		
+		var r = Math.sqrt(Math.pow(extents[3] - avg_x, 2)+ Math.pow(extents[4] - avg_y, 2) + Math.pow(extents[5] - avg_z, 2));
+	}else{
+		r=1;
+	}
+
+	var fieldOfView = 60;					//assumed to be 90 for now
+	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+
+	var fDistance = r / Math.tan(fieldOfView); 
+
+	zNear = fDistance - r;
+	zFar = fDistance + r;
+	
+	var thisProj = perspective(fieldOfView, aspect, zNear, zFar);
+
+	var projMatrix = gl.getUniformLocation(program, 'projMatrix');
+	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
+
+	// Set clear color
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+	var eye = vec3(0.0, 0.0, zNear*1.5); 	// position at camera at XYZ
+	var at  = vec3(avg_x, avg_y, avg_z);		// center point of what is being looked at XYZ
+	var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
+	var viewMatrix = lookAt(eye, at, up);
+	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
+	gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
 }
 
 function set_point_size(){
 	//Specify the vertex size
 	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
 	gl.uniform1f(offsetLoc, 2.0);
+}
+
+function set_vector_points(poly){
+	//
+	var vBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(poly), gl.STATIC_DRAW);
+	//
+	var vPosition = gl.getAttribLocation(program, "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);
 }
 
 function set_color_points(){
@@ -188,168 +236,164 @@ function set_color_points(){
 	gl.enableVertexAttribArray(vColor);
 }
 
-function set_perspective_view(){
-	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
+function render(poly) {
+	set_translation() 		// set translation if active
+	set_rotation()			// set rotation if active
+	if(pulse){ 
+		polygon_pulse();
+	}
 
-		// use the extents to make a bounding sphere
-		var dx=0;
-		var dy=0;
-		var dz=0;
-		if (extents.length){
-			avg_x = (extents[3]+extents[0])/2.0;
-			avg_y = (extents[4]+extents[1])/2.0;
-			avg_z = (extents[5]+extents[2])/2.0;
-			//calcualte the radius 
-			dx = extents[3] - avg_x;
-			dy = extents[4] - avg_y;
-			dz = extents[5] - avg_z;
-			var r = Math.sqrt((dx)*(dx) + (dy)*(dy) + (dz)*(dz));
-		}else{
-			r=1;
-		}
-		var fieldOfView = 60;					//assumed to be 90 for now
-		var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+	var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
 
-		var fDistance = r / Math.tan(fieldOfView); 
-	
-		zNear = fDistance - r;
-		zFar = fDistance + r;
-		
-		var thisProj = perspective(fieldOfView, aspect, zNear, zFar);
-	
-		var projMatrix = gl.getUniformLocation(program, 'projMatrix');
-		gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
-	
-		// Set clear color
-		gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
-		// CENTER THE OBJECT around the origin
-
-		// dx = 1 - avg_x;
-		// dy = 1 - avg_y;
-		// dz = 1 - avg_z;
-
-		// var dot_x=dot_product([1,0,0], [avg_x,avg_y,avg_z]);
-		// var dot_y=dot_product([0,1,0], [avg_x,avg_y,avg_z]);
-		// var dot_z=dot_product([0,0,1], [avg_x,avg_y,avg_z]);
-	
-		var eye = vec3(0.0, 0.0, zNear*1.5); 	// position at camera at XYZ
-		var at  = vec3(0.0, 0.0, 0.0);		// center point of what is being looked at XYZ
-		var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
-		var viewMatrix = lookAt(eye, at, up);
-		var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
-		gl.uniformMatrix4fv(viewMatrixLoc, false, flatten(viewMatrix));
+	// translate the model to the center of the screen
+	// var translateMatrix = translate(-avg_x+dx, -avg_y+dy, -avg_z+dz);
+	var translateMatrix = translate(dx+px, dy+py, dz+pz);
+	var ctMatrix = mult(translateMatrix, rotMatrix);
+	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	gl.drawArrays(gl.LINES, 0, poly.length);
+	update_state_output()
+	id = requestAnimationFrame(render);
 }
 
-function render() {
-	/*
-	Q. How do I calculate my FOV and camera (eye) position?
-
-A: Once you know your bounding box (your extents), you can use those to help you calculate FOV and camera location.
- Since the perspective projection function also takes in an aspect ratio, your model should not get distorted.
-
-For your camera (eye) position, think about how you can use your extents to help you determine how far back you should pull your camera from the mesh. 
-There's no one right way to do this, so please pick a method that makes logical sense to you.
-
-Once you know your camera position, you can calculate your FOV using your camera position, your extents, and some trigonometry. 
-Take a look at the image below:
-	*/
+function set_translation(){
 	// camera transforms
 	if (rotPosX){
-		theta -= 0.5;
-	}else if (rotNegX){
 		theta += 0.5;
+	}else if (rotNegX){
+		theta -= 0.5;
 	}else{
 		//do nothing
 	}
 	if (rotPosY){
-		beta -= 0.5;
-	}else if (rotNegY){
 		beta += 0.5;
+	}else if (rotNegY){
+		beta -= 0.5;
 	}else{
 		//do nothing
 	}
 	if (rotPosZ){
-		gamma -= 0.5;
-	}else if (rotNegZ){
 		gamma += 0.5;
+	}else if (rotNegZ){
+		gamma -= 0.5;
 	}else{
 		//do nothing
 	}
-	var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
-
-
-	// translate the model to the center of the screen
-	var translateMatrix = translate(-avg_x, -avg_y, -avg_z);
-
-	var ctMatrix = mult(translateMatrix, rotMatrix);
-	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-
-
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-	gl.drawArrays(gl.LINES, 0, points.length);
-	id = requestAnimationFrame(render);
-
 }
+
+function set_rotation(){
+	if( transPosX== true){
+		dx += 0.001;
+	}else if(transNegX== true){
+		dx -= 0.001;
+	}else{
+		//do nothing
+	}
+	if(transPosY == true){
+		dy += 0.001;
+	}else if(transNegY == true){
+		dy -= 0.001;
+	}else{
+		//do nothing
+	}
+	if(transPosZ == true){
+		dz += 0.001;
+	}else if(transNegZ== true){
+		dz -= 0.001;
+	}else{
+		//do nothing
+	}
+	if (theta%360==0){
+		theta = 0;
+	}
+	if (beta%360==0){
+		beta = 0;
+	}
+	if (gamma%360==0){
+		gamma = 0;
+	}
+}
+
+function polygon_pulse(){
+	// First, calculate the normal of each mesh face (i.e. each polygon) using the Newell method. 
+
+	/*
+	Then, create a pulsing animation by translating each face some fixed 
+		amount in its normal direction. By linearly interpolating the 
+		position of each vertex belonging to a given face between its 
+		original position and v+cn (where c is a constant) and then 
+		interpolating back in the opposite direction, we can make the mesh 
+		bulge outward and then recede in a smooth fashion. This operation 
+		should make the meshes look like they are "breathing" back and 
+		forth.
+
+	Notes:
+
+	Note that when the mesh breathes in, the faces of the mesh are in their 
+		original positions, and when the mesh breathes out, the faces move 
+		outwards and temporarily separate from neighboring faces.
+
+	Make sure the faces move out enough for the bulging effect to be noticeable 
+		and make the face movements nice and smooth (Not too fast).
+
+	You will need to use current transformation matrices (CTMs) on each 
+		face to translate it accordingly.
+
+
+	Translate each polygon according to its normal using a linear line orginating at 
+		each normal. When the polygon has been displaced the linear line is reversed
+		give the appearance of that a polygon is moving according to its normal. 
+	*/
+	var pmax = Math.sqrt(Math.pow(n[0],2)+Math.pow(n[1],2)+Math.pow(n[2],2))*0.3+disp;
+
+	px = c*n[0]*t;
+	py = c*n[1]*t;
+	pz = c*n[3]*t;
+
+	var pr = Math.sqrt(Math.pow(px,2)+Math.pow(py,2)+Math.pow(pz,2));
+	if(pr>=pmax){
+		c *= -1;
+		t = 0;
+	}else{
+		//do nothing
+	}
+	t+=1;
+	// sleep(delay);
+}
+
+function sleep(milliseconds) {
+	const date = Date.now();
+	let currentDate = null;
+	do {
+	  currentDate = Date.now();
+	} while (currentDate - date < milliseconds);
+  }
 
 function update_state_output() {
 	msg = "";
 	if (pulse == true){
 		msg += " Breathing: On<br>";
 	}else{
-		msg += " Breathing: Off <br>";
+		msg += " Breathing: Off<br>";
 	}
 
-	msg += " -------------------<br>";
-	if (transPosX == true){
-		msg += " X: +<br>";
-	}else if (transNegX == true){
-		msg += " X: -<br>";
-	}else{
-		msg += " X: <br>"
-	}
+	msg += "--------Translation-----------<br>";
+	msg += " X: "+dx.toFixed(3)+"<br>";
+	msg += " Y: "+dy.toFixed(3)+"<br>";
+	msg += " Z: "+dz.toFixed(3)+"<br>";
 
-	if (transPosY == true){
-		msg += " Y: +<br>";
-	}else if (transNegY == true){
-		msg += " Y: -<br>";
-	}else{
-		msg += " Y: <br>"
-	}
-
-	if (transPosZ == true){
-		msg += " Z: +<br>";
-	}else if (transNegZ == true){
-		msg += " Z: -<br>";
-	}else{
-		msg += " Z: <br>";
-	}
-
-	msg += " -------------------<br>";
+	msg += "--------Rotation---------------<br>";
 	//rotations
-	if (rotPosX == true){
-		msg += " X Rotation: +<br>";
-	}else if (rotNegX == true){
-		msg += " X Rotation: -<br>";
-	}else{
-		msg += " X Rotation: <br>";
-	}
-	if (rotPosY == true){
-		msg += " Y Rotation: +<br>";
-	}else if (rotNegY == true){
-		msg += " Y Rotation: -<br>";
-	}else{
-		msg += " Y Rotation: <br>";
-	}
-	if (rotPosZ == true){
-		msg += " Z Rotation: +<br>";
-	}else if (rotNegZ == true){
-		msg += " Z Rotation: -<br>";
-	}else{
-		msg += " Z Rotation: <br>";
-	}
+	msg += " Roll: " + theta.toFixed(1) + "<br>";
+	msg += " Pitch: " + beta.toFixed(1) + "<br>";
+	msg += " Yaw: " + gamma.toFixed(1) + "<br>";
+
+	msg += "--------Pulse---------------<br>";
+	//rotations
+	msg += " Disp: " + disp.toFixed(1) + "<br>";
+	msg += " Y: " + beta.toFixed(1) + "<br>";
+	msg += " Z: " + gamma.toFixed(1) + "<br>";
 	document.getElementById("meshState").innerHTML = msg;
 }
 
@@ -473,14 +517,19 @@ function process_keypress(theKey) {
 				rotNegZ = true;
 				rotPosZ = false;
 			}else{
-				rotNegZ == false;
+				rotNegZ = false;
 			}
 			break;
 		case 'K':
 		case 'k':
 			//Rotate your wireframe in an -Z-roll about it's CURRENT position.
-			rotNegZ = false;
-			rotPosZ = true;
+			if(rotPosZ==false){
+				rotNegZ = false;
+				rotPosZ = true;
+			}else{
+				rotPosZ = false;
+			}
+
 			break;
 
 		case 'B':
@@ -510,9 +559,21 @@ function process_keypress(theKey) {
 			rotNegZ = false;
 			rotPosZ = false;
 			//reset translations
+			dx = 0;
+			dy = 0;
+			dz = 0;
+			px = 0;
+			py = 0;
+			pz = 0;
+			//reset rotation
 			theta = 0;
 			beta = 0;
-			gramma = 0;
+			gamma = 0;
+
+			//pulse settings
+			t = 0
+			pulse = false;
+
 			break;		
 		default:
 			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message
@@ -533,6 +594,8 @@ function process_keypress(theKey) {
 			outputMessage += "-- ' L ' or ' l ' Rotate your wireframe in an - Z-roll about it's CURRENT position.<br>";
 			outputMessage += '-Pulse <br>';
 			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
+			outputMessage += '-Reset <br>';
+			outputMessage += "-- ' Q ' or ' q ' Resets the mesh to the orgin and turns off translations/rotations <br>";
 			document.getElementById('pageContent').innerHTML = outputMessage;
 	}
 	update_state_output();
@@ -690,6 +753,7 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 			}
 		}
 	}
+	// delay*=polygonIndexList.length; // set the delay by 1/polygons =  few polygons, should pulse slower
 	display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
@@ -701,16 +765,17 @@ function normal_newell_method(triVertex){
 		returns [m_x,m_y,m_z]
 	*/
 	
-	var normal = [0.0,0.0,0.0]; // [m_x,m_y,m_z]
+	var normal = vec4(0.0,0.0,0.0,1.0);//[0.0,0.0,0.0]; // [m_x,m_y,m_z]
 	var order = [1,2,0,2,0,1] 	// [y,z,x,z,x,y]
-	for(n=0;n<normal.length;n++){
+	for(n=0;n<normal.length-1;n++){
 		var sum = 0;
-		for(ii=0;ii<triVertex.length-1;ii++){	
+		for(ii=0;ii<triVertex.length-3;ii++){	
 			sum += (triVertex[ii][order[n]]-triVertex[ii+1][order[n]])*
 					(triVertex[ii][order[n+3]]+triVertex[ii+1][order[n+3]]);	
 		}
 		normal[n] = sum;		
 	}
+
 	return normal;
 }
 
@@ -738,9 +803,6 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 
 		 returns [polygons]
 	*/
-
-
-	
 
 	var polygons = [];
 	for(i=0;i<polygonIndexList.length;i++){

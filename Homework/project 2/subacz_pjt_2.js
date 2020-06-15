@@ -14,44 +14,34 @@ var gl;
 var program;
 var points;
 var colors;
+var extents;
+var canvas;
+var id;
+
+var polygons = [];
+
+var key = '';
 
 var theta = 0; 	//degrees x rotation
 var beta = 0;	//degrees y rotation
-var gamma =0;	//degrees z rotation
-
-var dx=0;		//units x translation
-var dy=0;		//units y translation
-var dz=0;		//units z translation
-
-var n = vec4(0.0,0.0,0.0,1.0);
+var gamma = 0;	//degrees z rotation
+var dx = 0;		//units x translation
+var dy = 0;		//units y translation
+var dz = 0;		//units z translation
 var c = 0.01;
 var px = 0;		//pulse x 
 var py = 0;		//pulse y 
 var pz = 0;		//pulse z
-var t =0;
-var disp =0.0001;
-// var delay = 1/100;
-
-var id;
-var key = '';
-
-var breathing = true;
+var t = 0;
+var disp = 0.0001;
 var x = 0.0;
 var y = 0.0;
 var z = 0.0;
-
-var roll = 0.0;
-var extents;	
-var polygons;
-var canvas;
-
-var pi = 3.14159265359;
 var zNear = 0.1;
-var zFar =100;
-
-var avg_x =1;
-var avg_y =1;
-var avg_z =1;
+var zFar = 100;
+var avg_x = 1;
+var avg_y = 1;
+var avg_z = 1;
 
 var pulse = false;
 var rotPosX = false;
@@ -66,8 +56,6 @@ var transPosZ = false;
 var transNegX = false;
 var transNegY = false;
 var transNegZ = false;
-
-// breathing, disp, x, y, z, rotPosX
 
 function dot_product(vector1, vector2) {
 	//https://www.w3resource.com/javascript-exercises/javascript-basic-exercise-108.php
@@ -93,82 +81,97 @@ function main() {
 			var polygonIndexList = []; // list of polygon indexs within the vertexCoordsList.
 			extents = [];
 			[vertexCoordsList, polygonIndexList, extents] = parse_ply_file(vertexCoordsList, polygonIndexList, fileReader.result);
-			var polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
-			draw_polygons(polygons);
-
+			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
+			render();
 		}
 		fileReader.readAsText(this.files[0]);
 	})
 
-	// Retrieve <canvas> element
-	canvas = document.getElementById('webgl');
 
-	// Get the rendering context for WebGL
-	gl = WebGLUtils.setupWebGL(canvas, undefined);
-	if (!gl) {
-		console.log('Failed to get the rendering context for WebGL');
-		return;
-	}
 
-	// Initialize shaders
-	// This function call will create a shader, upload the GLSL source, and compile the shader
-	program = initShaders(gl, "vshader", "fshader");
-
-	// We tell WebGL which shader program to execute.
-	gl.useProgram(program);
-
-	//Set up the viewport
-	//x, y - specify the lower-left corner of the viewport rectangle (in pixels)
-	//In WebGL, x and y are specified in the <canvas> coordinate system
-	//width, height - specify the width and height of the viewport (in pixels)
-	//canvas is the window, and viewport is the viewing area within that window
-	//This tells WebGL the -1 +1 clip space maps to 0 <-> gl.canvas.width for x and 0 <-> gl.canvas.height for y
-	gl.viewport(0, 0, canvas.width, canvas.height);
-
-	points = [];
-	colors = [];
-	extents = [];
-	polygons = [];
-
-	render([]);
+	init();
 	process_keypress(' ');
 	window.onkeypress = function (event) {
 		process_keypress(event.key)
 	}
 }
-function draw_polygons(polygons){   
-	// We tell WebGL which shader program to execute.
-	gl.useProgram(program);
 
-    // Tell WebGL how to convert from clip space to pixels
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-	// Clear the canvas AND the depth buffer.
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	// Turn on culling. By default backfacing triangles
-    // will be culled.
-    gl.enable(gl.CULL_FACE);
-    // Enable the depth buffer
-	gl.enable(gl.DEPTH_TEST);
+function init(){
+	// Retrieve <canvas> element
+	canvas = document.getElementById('webgl');
 
-	set_perspective_view();
-	set_point_size();
-	// For polygon in polygons, extract each point and draw them
-	for(var i = 0; i < polygons.length; ++i) {
-	// for(var i = 0; i < 5; i++) {
-		var poly = [];
-		colors = [];
-		for(var ii = 0; ii <polygons[i][0].length; ++ii) {
-			// set points 
-			poly.push(polygons[i][0][ii]);
-			// for solid colored faces use
-			colors.push(polygons[i][1][ii]);
-		}
-		n = polygons[i][2]
-		set_vector_points(poly);
-		set_color_points();
-		render(poly);
+	// Get the rendering context for WebGL
+	gl = WebGLUtils.setupWebGL(canvas, undefined);
+
+	if (!gl) {
+		console.log('Failed to get the rendering context for WebGL');
+		return;
 	}
+	// Initialize shaders
+	// This function call will create a shader, upload the GLSL source, and compile the shader
+	program = initShaders(gl, "vshader", "fshader");
+
 }
+
+function render(){   
+	init();
+	// Tell WebGL how to convert from clip space to pixels
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	// Turn on culling. By default backfacing triangles
+	gl.enable(gl.CULL_FACE);
+	gl.enable(gl.DEPTH_TEST);
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	// We tell WebGL which shader program to execute.
+	for(var i = 0; i < polygons.length; ++i) {
+	// for(var i = 0; i < 1; ++i) {	
+		gl.useProgram(program);
+		
+		var vBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STATIC_DRAW);
+
+		//Get the location of the shader's vPosition attribute in the GPU's memory
+		var vPosition = gl.getAttribLocation(program, "vPosition");
+		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+		//Turns the attribute on
+		gl.enableVertexAttribArray(vPosition);
+
+		var cBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STATIC_DRAW);
+	
+		var vColor = gl.getAttribLocation(program, "vColor");
+		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(vColor);
+
+		set_translation() 		// set translation if active
+		set_rotation()			// set rotation if active
+				// Setup camera
+				set_perspective_view();
+
+				// set points
+				set_point_size();
+		if(pulse){ 
+			polygon_pulse(i);
+		}
+		
+		var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
+	
+		// translate the model to the center of the screen
+		var translateMatrix = translate(dx+px, dy+py, dz+pz);
+		var ctMatrix = mult(translateMatrix, rotMatrix);
+		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+
+		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+		// Clear the canvas AND the depth buffer.
+		// gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		
+		gl.drawArrays(gl.LINES, 0, polygons[1][0].length);
+		update_state_output()
+	}
+	id = requestAnimationFrame(render);
+}
+
 function set_perspective_view(){
 	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
 
@@ -212,49 +215,6 @@ function set_point_size(){
 	//Specify the vertex size
 	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
 	gl.uniform1f(offsetLoc, 2.0);
-}
-
-function set_vector_points(poly){
-	//
-	var vBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(poly), gl.STATIC_DRAW);
-	//
-	var vPosition = gl.getAttribLocation(program, "vPosition");
-	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vPosition);
-}
-
-function set_color_points(){
-	//
-	var cBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-	//
-	var vColor = gl.getAttribLocation(program, "vColor");
-	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vColor);
-}
-
-function render(poly) {
-	set_translation() 		// set translation if active
-	set_rotation()			// set rotation if active
-	if(pulse){ 
-		polygon_pulse();
-	}
-
-	var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
-
-	// translate the model to the center of the screen
-	// var translateMatrix = translate(-avg_x+dx, -avg_y+dy, -avg_z+dz);
-	var translateMatrix = translate(dx+px, dy+py, dz+pz);
-	var ctMatrix = mult(translateMatrix, rotMatrix);
-	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.drawArrays(gl.LINES, 0, poly.length);
-	update_state_output()
-	id = requestAnimationFrame(render);
 }
 
 function set_translation(){
@@ -315,7 +275,7 @@ function set_rotation(){
 	}
 }
 
-function polygon_pulse(){
+function polygon_pulse(i){
 	// First, calculate the normal of each mesh face (i.e. each polygon) using the Newell method. 
 
 	/*
@@ -345,11 +305,11 @@ function polygon_pulse(){
 		each normal. When the polygon has been displaced the linear line is reversed
 		give the appearance of that a polygon is moving according to its normal. 
 	*/
-	var pmax = Math.sqrt(Math.pow(n[0],2)+Math.pow(n[1],2)+Math.pow(n[2],2))*0.3+disp;
+	var pmax = Math.sqrt(Math.pow(polygons[i][2][0],2)+Math.pow(polygons[i][2][1],2)+Math.pow(polygons[i][2][2],2))*0.3+disp;
 
-	px = c*n[0]*t;
-	py = c*n[1]*t;
-	pz = c*n[3]*t;
+	px = c*polygons[i][2][0]*t;
+	py = c*polygons[i][2][1]*t;
+	pz = c*polygons[i][2][2]*t;
 
 	var pr = Math.sqrt(Math.pow(px,2)+Math.pow(py,2)+Math.pow(pz,2));
 	if(pr>=pmax){

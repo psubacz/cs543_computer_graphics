@@ -114,7 +114,7 @@ function init(){
 	program = initShaders(gl, "vshader", "fshader");
 
 }
-
+var rotMatrix;
 function render(){   
 	init();
 	// Tell WebGL how to convert from clip space to pixels
@@ -128,7 +128,7 @@ function render(){
 	gl.useProgram(program);
 	set_perspective_view();
 	set_rotation()			// set rotation if active
-	var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
+	rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
 	for(var i = 0; i < polygons.length; ++i) {
 	// for(var i = 0; i < 1; ++i) {	
 		var vBuffer = gl.createBuffer();
@@ -168,6 +168,51 @@ function render(){
 		id = requestAnimationFrame(render);
 	}
 }
+
+function polygon_pulse(i){
+	/*
+	Then, create a pulsing animation by translating each face some fixed 
+		amount in its normal direction. By linearly interpolating the 
+		position of each vertex belonging to a given face between its 
+		original position and v+cn (where c is a constant) and then 
+		interpolating back in the opposite direction, we can make the mesh 
+		bulge outward and then recede in a smooth fashion. This operation 
+		should make the meshes look like they are "breathing" back and 
+		forth.
+
+	Notes:
+	Note that when the mesh breathes in, the faces of the mesh are in their 
+		original positions, and when the mesh breathes out, the faces move 
+		outwards and temporarily separate from neighboring faces.
+	Make sure the faces move out enough for the bulging effect to be noticeable 
+		and make the face movements nice and smooth (Not too fast).
+	You will need to use current transformation matrices (CTMs) on each 
+		face to translate it accordingly.
+	Translate each polygon according to its normal using a linear line orginating at 
+		each normal. When the polygon has been displaced the linear line is reversed
+		give the appearance of that a polygon is moving according to its normal. 
+	*/
+	polygons[i][4]+=0.01*polygons[i][5];
+
+	disp = Math.sin(polygons[i][4]);
+	var tr = translate(c*polygons[i][2][0]*disp*100, c*polygons[i][2][1]*disp*100, c*polygons[i][2][2]*disp*100,1)
+	var tem = mult(rotMatrix,tr);
+	// points in x 
+	polygons[i][3][0] = tem[0][3];
+	// points in y
+	polygons[i][3][1] = tem[1][3];
+	// points in z
+	polygons[i][3][2] = tem[2][3];
+
+	
+
+	var pr = Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
+	if (polygons[i][4]>=0.382 || polygons[i][4]<=0.0){  //0.382 is pi/8
+		polygons[i][5] *= -1
+	}
+	// sleep(pulse_delay);
+}
+
 
 function set_perspective_view(){
 	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
@@ -217,23 +262,23 @@ function set_point_size(){
 function set_rotation(){
 	// camera transforms
 	if (rotPosX){
-		theta += 15;
+		theta += 5;
 	}else if (rotNegX){
-		theta -= 15;
+		theta -= 5;
 	}else{
 		//do nothing
 	}
 	if (rotPosY){
-		beta += 15;
+		beta += 5;
 	}else if (rotNegY){
-		beta -= 15;
+		beta -= 5;
 	}else{
 		//do nothing
 	}
 	if (rotPosZ){
-		gamma += 15;
+		gamma += 5;
 	}else if (rotNegZ){
-		gamma -= 15;
+		gamma -= 5;
 	}else{
 		//do nothing
 	}
@@ -272,50 +317,6 @@ function set_translation(){
 	}
 }
 
-function polygon_pulse(i){
-	// First, calculate the normal of each mesh face (i.e. each polygon) using the Newell method. 
-
-	/*
-	Then, create a pulsing animation by translating each face some fixed 
-		amount in its normal direction. By linearly interpolating the 
-		position of each vertex belonging to a given face between its 
-		original position and v+cn (where c is a constant) and then 
-		interpolating back in the opposite direction, we can make the mesh 
-		bulge outward and then recede in a smooth fashion. This operation 
-		should make the meshes look like they are "breathing" back and 
-		forth.
-
-	Notes:
-
-	Note that when the mesh breathes in, the faces of the mesh are in their 
-		original positions, and when the mesh breathes out, the faces move 
-		outwards and temporarily separate from neighboring faces.
-
-	Make sure the faces move out enough for the bulging effect to be noticeable 
-		and make the face movements nice and smooth (Not too fast).
-
-	You will need to use current transformation matrices (CTMs) on each 
-		face to translate it accordingly.
-
-
-	Translate each polygon according to its normal using a linear line orginating at 
-		each normal. When the polygon has been displaced the linear line is reversed
-		give the appearance of that a polygon is moving according to its normal. 
-	*/
-	polygons[i][4]+=0.01*polygons[i][5];
-
-	disp = Math.sin(polygons[i][4]);
-
-	polygons[i][3][0] = c*polygons[i][2][0]*disp*100;
-	polygons[i][3][1] = c*polygons[i][2][1]*disp*100;
-	polygons[i][3][2] = c*polygons[i][2][2]*disp*100;
-
-	var pr = Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
-	if (polygons[i][4]>=0.382 || polygons[i][4]<=0.0){  //0.382 is pi/8
-		polygons[i][5] *= -1
-	}
-	// sleep(pulse_delay);
-}
 
 function sleep(milliseconds) {
 	const date = Date.now();

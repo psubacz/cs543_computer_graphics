@@ -5,7 +5,8 @@
  * @author Joshua Cuneo
  * @author Peter Subacz
  * 
- * using multiple draw calls  example:https://webglfundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
+ * using multiple draw calls example: https://webglfundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
+ * strats to draw multiple objects to a screen: 
  */
 
 
@@ -28,12 +29,14 @@ var gamma = 0;	//degrees z rotation
 var dx = 0;		//units x translation
 var dy = 0;		//units y translation
 var dz = 0;		//units z translation
-var c = 0.01;
-var px = 0;		//pulse x 
-var py = 0;		//pulse y 
-var pz = 0;		//pulse z
+
+var c = 0.005;
+var pulse_scale = 0.9;
+var pulse_delay = 10; //time in ms
+var pulse_direction = 1
 var t = 0;
-var disp = 0.0001;
+var disp = 0;
+
 var x = 0.0;
 var y = 0.0;
 var z = 0.0;
@@ -146,19 +149,18 @@ function render(){
 
 		set_translation() 		// set translation if active
 		set_rotation()			// set rotation if active
-				// Setup camera
-				set_perspective_view();
+		// Setup camera
+		set_perspective_view();
 
-				// set points
-				set_point_size();
+		// set points
+		set_point_size();
 		if(pulse){ 
 			polygon_pulse(i);
 		}
 		
 		var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
 	
-		// translate the model to the center of the screen
-		var translateMatrix = translate(dx+px, dy+py, dz+pz);
+		var translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
 		var ctMatrix = mult(translateMatrix, rotMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 
@@ -305,21 +307,33 @@ function polygon_pulse(i){
 		each normal. When the polygon has been displaced the linear line is reversed
 		give the appearance of that a polygon is moving according to its normal. 
 	*/
-	var pmax = Math.sqrt(Math.pow(polygons[i][2][0],2)+Math.pow(polygons[i][2][1],2)+Math.pow(polygons[i][2][2],2))*0.3+disp;
 
-	px = c*polygons[i][2][0]*t;
-	py = c*polygons[i][2][1]*t;
-	pz = c*polygons[i][2][2]*t;
 
-	var pr = Math.sqrt(Math.pow(px,2)+Math.pow(py,2)+Math.pow(pz,2));
-	if(pr>=pmax){
-		c *= -1;
-		t = 0;
-	}else{
-		//do nothing
+	var pMax = Math.sqrt(Math.pow(polygons[i][2][0],2)+Math.pow(polygons[i][2][1],2)+Math.pow(polygons[i][2][2],2))*pulse_scale;
+	// var pMin = -(Math.sqrt(Math.pow(polygons[i][2][0],2)+Math.pow(polygons[i][2][1],2)+Math.pow(polygons[i][2][2],2))*(1-pulse_scale));
+	var pMin = 0;
+
+	polygons[i][3][0] = c*polygons[i][2][0]*t+disp;
+	polygons[i][3][1] = c*polygons[i][2][1]*t+disp;
+	polygons[i][3][2] = c*polygons[i][2][2]*t+disp;
+	
+	var pr = pulse_direction*Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
+
+	if(pr>pMax){
+	// 	c *= -1;	//reverse the linear scaling
+	t=0
+	// 	// pulse_direction *= -1;
+	// 	// disp =1
+	// // }else if (pr<pMin){
+	// // 	c *= -1;	//reverse the linear scaling
+	// // 	// pulse_direction *= -1;
+	// // 	// disp = 0
+	// // }else{
+	// // 	//do nothing
 	}
-	t+=1;
-	// sleep(delay);
+	t+=pulse_direction;
+	console.log(t);
+	sleep(pulse_delay);
 }
 
 function sleep(milliseconds) {
@@ -358,7 +372,7 @@ function update_state_output() {
 }
 
 function process_keypress(theKey) {
-	// function to toggle modes,x
+	// function to toggle modes,
 
 	//on key presses, do change the colors or modes
 	switch (theKey) {
@@ -497,7 +511,7 @@ function process_keypress(theKey) {
 			if (pulse == false){//turn on
 				pulse = true;				
 			}else{//turn off
-				pulse = false;				
+				pulse = false;
 			}
 			//Toggle pulsing meshes
 			break;
@@ -522,9 +536,6 @@ function process_keypress(theKey) {
 			dx = 0;
 			dy = 0;
 			dz = 0;
-			px = 0;
-			py = 0;
-			pz = 0;
 			//reset rotation
 			theta = 0;
 			beta = 0;
@@ -718,24 +729,23 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
 
-function normal_newell_method(triVertex){
+function normal_newell_method(vectors){
 	/*
 		Computes the normal via the newwell method for the m_x, m_y, and m_z
 
 		returns [m_x,m_y,m_z]
 	*/
 	
-	var normal = vec4(0.0,0.0,0.0,1.0);//[0.0,0.0,0.0]; // [m_x,m_y,m_z]
-	var order = [1,2,0,2,0,1] 	// [y,z,x,z,x,y]
+	var normal = vec4(0.0,0.0,0.0,1.0); // [m_x,m_y,m_z]
+	var order = [1,2,0,2,0,1] 			// [y,z,x,z,x,y]
 	for(n=0;n<normal.length-1;n++){
 		var sum = 0;
-		for(ii=0;ii<triVertex.length-3;ii++){	
-			sum += (triVertex[ii][order[n]]-triVertex[ii+1][order[n]])*
-					(triVertex[ii][order[n+3]]+triVertex[ii+1][order[n+3]]);	
+		for(ii=0;ii<vectors.length-3;ii++){	
+			sum += (vectors[ii][order[n]]-vectors[ii+1][order[n]])*
+					(vectors[ii][order[n+3]]+vectors[ii+1][order[n+3]]);	
 		}
 		normal[n] = sum;		
 	}
-
 	return normal;
 }
 
@@ -757,10 +767,11 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 					vec4(),
 					vec4(),
 				]
-				normal = 
+				normal = vec4();
+				displacement=vec4();
+				]
 			],
 		 ]
-
 		 returns [polygons]
 	*/
 
@@ -770,18 +781,14 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		var a = polygonIndexList[i][1]
 		var b = polygonIndexList[i][2]
 		var c = polygonIndexList[i][3]
-
 		var indices = [ a, b, c, a, c, b ];
-		for ( var ii = 0; ii < indices.length; ++ii ){
-			polygon[0][ii] = vertexCoordsList[indices[ii]];
-			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   // white
+		for (var ii = 0; ii < indices.length; ++ii ){
+			polygon[0][ii] = vertexCoordsList[indices[ii]];		// vertices list
+			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   			// color list
 		}
-
-
-		polygon[2] = normal_newell_method(polygon[0]);
-		polygon[1][3]= [1.0, 1.0, 1.0, 1.0]   // white
+		polygon[2] = normal_newell_method(polygon[0]);			//normal
+		polygon[3] = vec4(0.0,0.0,0.0,0.0);   					//displacement
 		polygons[i] = polygon;
 	}
-	// console.log(polygons);
 	return polygons;
 }

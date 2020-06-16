@@ -32,9 +32,7 @@ var dz = 0;		//units z translation
 
 var c = 0.005;
 var pulse_scale = 0.9;
-var pulse_delay = 10; //time in ms
-var pulse_direction = 1
-var t = 0;
+var pulse_delay = 1; //time in ms
 var disp = 0;
 
 var x = 0.0;
@@ -307,32 +305,19 @@ function polygon_pulse(i){
 		each normal. When the polygon has been displaced the linear line is reversed
 		give the appearance of that a polygon is moving according to its normal. 
 	*/
+	polygons[i][4]+=0.01*polygons[i][5];
 
+	disp = Math.sin(polygons[i][4]);
 
-	var pMax = Math.sqrt(Math.pow(polygons[i][2][0],2)+Math.pow(polygons[i][2][1],2)+Math.pow(polygons[i][2][2],2))*pulse_scale;
-	// var pMin = -(Math.sqrt(Math.pow(polygons[i][2][0],2)+Math.pow(polygons[i][2][1],2)+Math.pow(polygons[i][2][2],2))*(1-pulse_scale));
-	var pMin = 0;
+	polygons[i][3][0] = c*polygons[i][2][0]*disp*100;
+	polygons[i][3][1] = c*polygons[i][2][1]*disp*100;
+	polygons[i][3][2] = c*polygons[i][2][2]*disp*100;
 
-	polygons[i][3][0] = c*polygons[i][2][0]*t+disp;
-	polygons[i][3][1] = c*polygons[i][2][1]*t+disp;
-	polygons[i][3][2] = c*polygons[i][2][2]*t+disp;
-	
-	var pr = pulse_direction*Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
-
-	if(pr>pMax){
-	// 	c *= -1;	//reverse the linear scaling
-	t=0
-	// 	// pulse_direction *= -1;
-	// 	// disp =1
-	// // }else if (pr<pMin){
-	// // 	c *= -1;	//reverse the linear scaling
-	// // 	// pulse_direction *= -1;
-	// // 	// disp = 0
-	// // }else{
-	// // 	//do nothing
+	var pr = Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
+	if (polygons[i][4]>=0.382 || polygons[i][4]<=0.0){  //0.382 is pi/8
+		polygons[i][5] *= -1
 	}
-	t+=pulse_direction;
-	console.log(t);
+	console.log(polygons[i][4]);
 	sleep(pulse_delay);
 }
 
@@ -769,6 +754,7 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 				]
 				normal = vec4();
 				displacement=vec4();
+				zeta = 0;
 				]
 			],
 		 ]
@@ -788,6 +774,8 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		}
 		polygon[2] = normal_newell_method(polygon[0]);			//normal
 		polygon[3] = vec4(0.0,0.0,0.0,0.0);   					//displacement
+		polygon[4] = 0;
+		polygon[5] = 1;
 		polygons[i] = polygon;
 	}
 	return polygons;

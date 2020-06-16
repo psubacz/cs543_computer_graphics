@@ -123,9 +123,12 @@ function render(){
 	gl.enable(gl.DEPTH_TEST);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	// We tell WebGL which shader program to execute.
+	// Setup camera
+	gl.useProgram(program);
+	set_perspective_view();
 	for(var i = 0; i < polygons.length; ++i) {
 	// for(var i = 0; i < 1; ++i) {	
-		gl.useProgram(program);
+
 		
 		var vBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -147,8 +150,7 @@ function render(){
 
 		set_translation() 		// set translation if active
 		set_rotation()			// set rotation if active
-		// Setup camera
-		set_perspective_view();
+
 
 		// set points
 		set_point_size();
@@ -721,9 +723,9 @@ function normal_newell_method(vectors){
 		returns [m_x,m_y,m_z]
 	*/
 	
-	var normal = vec4(0.0,0.0,0.0,1.0); // [m_x,m_y,m_z]
+	var normal = vec3(0.0,0.0,0.0,1.0); // [m_x,m_y,m_z]
 	var order = [1,2,0,2,0,1] 			// [y,z,x,z,x,y]
-	for(n=0;n<normal.length-1;n++){
+	for(n=0;n<normal.length;n++){
 		var sum = 0;
 		for(ii=0;ii<vectors.length-3;ii++){	
 			sum += (vectors[ii][order[n]]-vectors[ii+1][order[n]])*

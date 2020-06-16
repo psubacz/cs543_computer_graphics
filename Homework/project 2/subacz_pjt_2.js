@@ -44,6 +44,7 @@ var avg_x = 1;
 var avg_y = 1;
 var avg_z = 1;
 
+var animation = true;
 var pulse = false;
 var rotPosX = false;
 var rotNegX = false;
@@ -126,13 +127,13 @@ function render(){
 	// Setup camera
 	gl.useProgram(program);
 	set_perspective_view();
+	set_rotation()			// set rotation if active
+	var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
 	for(var i = 0; i < polygons.length; ++i) {
 	// for(var i = 0; i < 1; ++i) {	
-
-		
 		var vBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STATIC_DRAW);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STREAM_DRAW);
 
 		//Get the location of the shader's vPosition attribute in the GPU's memory
 		var vPosition = gl.getAttribLocation(program, "vPosition");
@@ -142,36 +143,30 @@ function render(){
 
 		var cBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STATIC_DRAW);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STREAM_DRAW);
 	
 		var vColor = gl.getAttribLocation(program, "vColor");
 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 		gl.enableVertexAttribArray(vColor);
-
-		set_translation() 		// set translation if active
-		set_rotation()			// set rotation if active
-
 
 		// set points
 		set_point_size();
 		if(pulse){ 
 			polygon_pulse(i);
 		}
-		
-		var rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
-	
+		set_translation() 		// set translation if active
 		var translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
 		var ctMatrix = mult(translateMatrix, rotMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-		// Clear the canvas AND the depth buffer.
-		// gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		
-		gl.drawArrays(gl.LINES, 0, polygons[1][0].length);
+		gl.drawArrays(gl.LINE_LOOP, 0, polygons[1][0].length);
 		update_state_output()
 	}
-	id = requestAnimationFrame(render);
+	if(animation){
+		id = requestAnimationFrame(render);
+	}
 }
 
 function set_perspective_view(){
@@ -205,7 +200,7 @@ function set_perspective_view(){
 	// Set clear color
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-	var eye = vec3(0.0, 0.0, zNear*1.5); 	// position at camera at XYZ
+	var eye = vec3(0.0, 0.0, zNear*1.4); 	// position at camera at XYZ
 	var at  = vec3(avg_x, avg_y, avg_z);		// center point of what is being looked at XYZ
 	var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
 	var viewMatrix = lookAt(eye, at, up);
@@ -219,32 +214,41 @@ function set_point_size(){
 	gl.uniform1f(offsetLoc, 2.0);
 }
 
-function set_translation(){
+function set_rotation(){
 	// camera transforms
 	if (rotPosX){
-		theta += 0.5;
+		theta += 15;
 	}else if (rotNegX){
-		theta -= 0.5;
+		theta -= 15;
 	}else{
 		//do nothing
 	}
 	if (rotPosY){
-		beta += 0.5;
+		beta += 15;
 	}else if (rotNegY){
-		beta -= 0.5;
+		beta -= 15;
 	}else{
 		//do nothing
 	}
 	if (rotPosZ){
-		gamma += 0.5;
+		gamma += 15;
 	}else if (rotNegZ){
-		gamma -= 0.5;
+		gamma -= 15;
 	}else{
 		//do nothing
 	}
+	if (theta%360==0){
+		theta = 0;
+	}
+	if (beta%360==0){
+		beta = 0;
+	}
+	if (gamma%360==0){
+		gamma = 0;
+	}
 }
 
-function set_rotation(){
+function set_translation(){
 	if( transPosX== true){
 		dx += 0.001;
 	}else if(transNegX== true){
@@ -265,15 +269,6 @@ function set_rotation(){
 		dz -= 0.001;
 	}else{
 		//do nothing
-	}
-	if (theta%360==0){
-		theta = 0;
-	}
-	if (beta%360==0){
-		beta = 0;
-	}
-	if (gamma%360==0){
-		gamma = 0;
 	}
 }
 
@@ -319,8 +314,7 @@ function polygon_pulse(i){
 	if (polygons[i][4]>=0.382 || polygons[i][4]<=0.0){  //0.382 is pi/8
 		polygons[i][5] *= -1
 	}
-	console.log(polygons[i][4]);
-	sleep(pulse_delay);
+	// sleep(pulse_delay);
 }
 
 function sleep(milliseconds) {
@@ -353,8 +347,6 @@ function update_state_output() {
 	msg += "--------Pulse---------------<br>";
 	//rotations
 	msg += " Disp: " + disp.toFixed(1) + "<br>";
-	msg += " Y: " + beta.toFixed(1) + "<br>";
-	msg += " Z: " + gamma.toFixed(1) + "<br>";
 	document.getElementById("meshState").innerHTML = msg;
 }
 
@@ -723,16 +715,30 @@ function normal_newell_method(vectors){
 		returns [m_x,m_y,m_z]
 	*/
 	
-	var normal = vec3(0.0,0.0,0.0,1.0); // [m_x,m_y,m_z]
-	var order = [1,2,0,2,0,1] 			// [y,z,x,z,x,y]
-	for(n=0;n<normal.length;n++){
-		var sum = 0;
-		for(ii=0;ii<vectors.length-3;ii++){	
-			sum += (vectors[ii][order[n]]-vectors[ii+1][order[n]])*
-					(vectors[ii][order[n+3]]+vectors[ii+1][order[n+3]]);	
+	var normal = vec3(0.0,0.0,0.0); // [m_x,m_y,m_z]
+	//mx
+	var sum = 0;
+		for(ii=0;ii<vectors.length-1;ii++){	
+			sum += (vectors[ii][1]-vectors[ii+1][1])*
+				(vectors[ii][2]+vectors[ii+1][2]);	
 		}
-		normal[n] = sum;		
-	}
+	normal[0] = sum;
+
+	//my
+	var sum = 0;
+		for(ii=0;ii<vectors.length-1;ii++){	
+			sum += (vectors[ii][2]-vectors[ii+1][2])*
+				(vectors[ii][0]+vectors[ii+1][0]);		
+		}
+	normal[1] = sum
+	
+	//mz
+	var sum = 0;
+		for(ii=0;ii<vectors.length-1;ii++){	
+			sum += (vectors[ii][0]-vectors[ii+1][0])*
+				(vectors[ii][1]+vectors[ii+1][1]);	
+		}
+	normal[2] = sum;	
 	return normal;
 }
 
@@ -770,7 +776,7 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		var b = polygonIndexList[i][2]
 		var c = polygonIndexList[i][3]
 		var indices = [ a, b, c, a, c, b ];
-		for (var ii = 0; ii < indices.length; ++ii ){
+		for (var ii = 0; ii < indices.length-2; ++ii ){
 			polygon[0][ii] = vertexCoordsList[indices[ii]];		// vertices list
 			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   			// color list
 		}

@@ -115,6 +115,7 @@ function init(){
 
 }
 var rotMatrix;
+
 function render(){   
 	init();
 	// Tell WebGL how to convert from clip space to pixels
@@ -127,10 +128,10 @@ function render(){
 	// Setup camera
 	gl.useProgram(program);
 	set_perspective_view();
-	set_rotation()			// set rotation if active
+	set_rotation();			// set rotation if active
+	set_translation(); 		// set translation if active
 	rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
 	for(var i = 0; i < polygons.length; ++i) {
-	// for(var i = 0; i < 1; ++i) {	
 		var vBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STREAM_DRAW);
@@ -138,8 +139,7 @@ function render(){
 		//Get the location of the shader's vPosition attribute in the GPU's memory
 		var vPosition = gl.getAttribLocation(program, "vPosition");
 		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-		//Turns the attribute on
-		gl.enableVertexAttribArray(vPosition);
+		gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
 
 		var cBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
@@ -149,12 +149,10 @@ function render(){
 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 		gl.enableVertexAttribArray(vColor);
 
-		// set points
-		set_point_size();
 		if(pulse){ 
 			polygon_pulse(i);
 		}
-		set_translation() 		// set translation if active
+		
 		var translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
 		var ctMatrix = mult(translateMatrix, rotMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
@@ -171,48 +169,29 @@ function render(){
 
 function polygon_pulse(i){
 	/*
-	Then, create a pulsing animation by translating each face some fixed 
-		amount in its normal direction. By linearly interpolating the 
-		position of each vertex belonging to a given face between its 
-		original position and v+cn (where c is a constant) and then 
-		interpolating back in the opposite direction, we can make the mesh 
-		bulge outward and then recede in a smooth fashion. This operation 
-		should make the meshes look like they are "breathing" back and 
-		forth.
+		Displaces a polygon a using the following equation: 		c*n*sin(alpha)*100
+			where: c is the scaling factor, n is the normal, sin(alpha) is the direction. Alpha is scaled between 
+			0.0 -> pi/16. When alpha exceeds each limit the directional
 
-	Notes:
-	Note that when the mesh breathes in, the faces of the mesh are in their 
-		original positions, and when the mesh breathes out, the faces move 
-		outwards and temporarily separate from neighboring faces.
-	Make sure the faces move out enough for the bulging effect to be noticeable 
-		and make the face movements nice and smooth (Not too fast).
-	You will need to use current transformation matrices (CTMs) on each 
-		face to translate it accordingly.
-	Translate each polygon according to its normal using a linear line orginating at 
-		each normal. When the polygon has been displaced the linear line is reversed
-		give the appearance of that a polygon is moving according to its normal. 
 	*/
-	polygons[i][4]+=0.01*polygons[i][5];
+	polygons[i][4]+=0.01*polygons[i][5]; // multiply by the directionality constant
 
-	disp = Math.sin(polygons[i][4]);
+	disp = Math.sin(polygons[i][4]); 	 // get displacement
+	//translate
 	var tr = translate(c*polygons[i][2][0]*disp*100, c*polygons[i][2][1]*disp*100, c*polygons[i][2][2]*disp*100,1)
+	// correct the translation relevative the any rotations
 	var tem = mult(rotMatrix,tr);
-	// points in x 
+	// points in x,y,z
 	polygons[i][3][0] = tem[0][3];
-	// points in y
 	polygons[i][3][1] = tem[1][3];
-	// points in z
 	polygons[i][3][2] = tem[2][3];
 
-	
-
 	var pr = Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
-	if (polygons[i][4]>=0.382 || polygons[i][4]<=0.0){  //0.382 is pi/8
+	if (polygons[i][4]>=(Math.PI/16) || polygons[i][4]<=-0.0){  //0.382 is pi/8
 		polygons[i][5] *= -1
 	}
 	// sleep(pulse_delay);
 }
-
 
 function set_perspective_view(){
 	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
@@ -317,7 +296,6 @@ function set_translation(){
 	}
 }
 
-
 function sleep(milliseconds) {
 	const date = Date.now();
 	let currentDate = null;
@@ -347,7 +325,7 @@ function update_state_output() {
 
 	msg += "--------Pulse---------------<br>";
 	//rotations
-	msg += " Disp: " + disp.toFixed(1) + "<br>";
+	msg += " Disp: " + disp.toFixed(3) + "<br>";
 	document.getElementById("meshState").innerHTML = msg;
 }
 

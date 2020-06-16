@@ -1,13 +1,14 @@
 Subacz Project 1 Read Me
 
 These folder contain:
-    - project_2.html
-    - project_2.js
+    - subacz_pjt_2.html
+    - subacz_pjt_2.js
     - SubaczPeter_Pjt2_readme.txt (this file)
     - cs4731_pjt2_ply_files (directory)
     - lib (directory)
 
-To open the project, open the html in a firefox or chrome web browser.
+To open the project, open the html in a firefox or chrome web browser, select the file broswe button,
+    and select a then click ok. The mesh will be rendered to the screen 
 
 The project will default to the pulsating mode. 
 

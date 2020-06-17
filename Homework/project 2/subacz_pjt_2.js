@@ -33,15 +33,13 @@
  * 		Press ' L ' or ' l ' Rotate your wireframe in an - Yaw
  * 	Breathing animation
  * 		Press ' B ' or ' b ' to toggle the breathing (pulsing).
+ * 	Draw normal lines
+ * 		Press ' D ' or ' d ' to toggle the normal lines.
+ * 	Change colors
+ * 		press ' E ' or ' e ' to rotate between colors.
  * 	Reset rotations and Translations
- * 		Press ' Q ' or ' q ' to turn off active modes (pulsing).
- * 		Press ' W ' or ' w ' to reset model to origin
- * 
- * 
- * 
- * 
- * 
- * 
+ * 		Press ' Q ' or ' q ' to turn off active modes.
+ * 		Press ' W ' or ' w ' to reset model to origin.
  */
 
 // global variables
@@ -68,18 +66,21 @@ var dz = 0;		//units z translation
 var pulseScale = 0.05;	//pulse scale
 var pulseIndex = 0;	//pulse index for animation
 
-var animationDelay = 1000;	//sleep delay in ms
+var animationDelay = 500;	//sleep delay in ms
 
-var perspectiveScale = 0.1;
+var perspectiveScale = 0.09;
 var zNear = 0.1;
 var zFar = 100;
-var avg_x = 1;
-var avg_y = 1;
-var avg_z = 1;
+//polygon center
+var centerX = 1;
+var centerY = 1;
+var centerZ = 1;
+var normalLineScale = 0.15;
 
 //control bools
 var animation = true;
 var initSleep = true;
+var drawNormal = false;
 var pulse = false;
 var rotPosX = false;
 var rotNegX = false;
@@ -95,16 +96,19 @@ var transNegY = false;
 var transNegZ = false;
 
 function main() {
+	// console.log(document.getElementById('b1'));
+
 	update_state_output(); // update the status box with current status
 	process_keypress(' '); // show the possible inputs
 	window.onkeypress = function (event) { //when a key is pressed, process the input
 		process_keypress(event.key)
 	}
-
+	
 	// Add the event listener to parse input file
 	document.getElementById('ply-file').addEventListener('change', function () {
 		var fileReader = new FileReader();
 		fileReader.onload = function (e) {
+			animation = false;
 			extents = [];
 			polygons = [];
 			var vertexCoordsList = []; // list of vertex cordinates 
@@ -113,6 +117,8 @@ function main() {
 			[vertexCoordsList, polygonIndexList, extents] = parse_ply_file(vertexCoordsList, polygonIndexList, fileReader.result);
 			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
 			init();
+			animationDelay *= 1/(polygons.length);
+			animation = true;
 			render();
 		}
 		fileReader.readAsText(this.files[0]);
@@ -147,6 +153,30 @@ function init(){
 	}
 }
 
+function set_colors(colorIndex){
+	/*** COLOR DATA ***/
+	var colors = [];
+	for(ii=1;ii<4;ii++){
+		switch (colorIndex){
+			case 0:
+				colors.push(vec4(0.0, 0.0, 0.0, 1.0)); //black
+				break;
+			case 1:
+				colors.push(vec4(1.0, 0.0, 0.0, 1.0)); //red
+				break;
+			case 2:
+				colors.push(vec4(0.0, 1.0, 0.0, 1.0)); //green
+				break;
+   			case 3:
+				colors.push(vec4(0.0, 0.0, 1.0, 1.0)); //blue
+				break;
+		default:
+			colors.push(vec4(0.0, 0.0, 0.0, 1.0)); //black
+		}
+		return colors;
+	}
+}
+
 function render(){   
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	// We tell WebGL which shader program to execute.
@@ -156,7 +186,6 @@ function render(){
 	
 	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));// calculate the new rotation per render
 	if (pulse){
-		
 		if (pulseIndex<polygons[0][6].length-1){
 			pulseIndex+=1;
 		}else{
@@ -187,20 +216,67 @@ function render(){
 
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
 		gl.drawArrays(gl.LINE_LOOP, 0, polygons[1][0].length);
+
+		if(drawNormal){
+			var vBuffer = gl.createBuffer();		// Create vertex buffer
+			gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][5]), gl.STATIC_DRAW);
+			//Get the location of the shader's vPosition attribute in the GPU's memory
+			var vPosition = gl.getAttribLocation(program, "vPosition");
+			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
+		
+			var cBuffer = gl.createBuffer();		// Create color buffer
+			gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten([vec4(0.0,1.0,0.0,1),vec4(0.0,1.0,0.0,1)]), gl.STATIC_DRAW);
+			//Get the location of the shader's vColor attribute in the GPU's memory
+			var vColor = gl.getAttribLocation(program, "vColor");
+			gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vColor);//Turns the attribute on
+			gl.drawArrays(gl.LINES, 0,2);
+
+		}
 		update_state_output()
 	}
 
-	id = requestAnimationFrame(render);
-	if (animationDelay>0.001){
+	// var cCenter = vec4(centerX,centerY,centerZ,1.0);
+	// var cColor = vec4(1.0,0.0,0.0,1)
+	
+	// translateMatrix = translate(0, 0, 0);
+	// var vBuffer = gl.createBuffer();		// Create vertex buffer
+	// gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	// gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
+	// //Get the location of the shader's vPosition attribute in the GPU's memory
+	// var vPosition = gl.getAttribLocation(program, "vPosition");
+	// gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	// gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
+
+	// var cBuffer = gl.createBuffer();		// Create color buffer
+	// gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+	// gl.bufferData(gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW);
+	// //Get the location of the shader's vColor attribute in the GPU's memory
+	// var vColor = gl.getAttribLocation(program, "vColor");
+	// gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+	// gl.enableVertexAttribArray(vColor);//Turns the attribute on
+	
+	// var ctMatrix = mult(translateMatrix,rotMatrix);
+	// var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	// gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+	// gl.drawArrays(gl.POINTS, 0,1);
+
+	if (animation){
+		id = requestAnimationFrame(render);
+	}
+	if (animationDelay>0.15){
 		sleep(animationDelay);
 	}
 }
+
 function sleep( sleepDuration ){
 	// apperently JS does not have a sleep utility
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){ /* do nothing */ } 
 }
-
 
 function set_perspective_view(){
 	/*
@@ -208,11 +284,11 @@ function set_perspective_view(){
 	*/
 	// use the extents to make a bounding sphere
 	if (extents.length){
-		avg_x = (extents[3]+extents[0])/2.0;
-		avg_y = (extents[4]+extents[1])/2.0;
-		avg_z = (extents[5]+extents[2])/2.0;
-		//calcualte the radius 
-		var r = Math.sqrt(Math.pow(extents[3] - avg_x, 2)+ Math.pow(extents[4] - avg_y, 2) + Math.pow(extents[5] - avg_z, 2));
+		centerX = (extents[3]+extents[0])/2.0;
+		centerY = (extents[4]+extents[1])/2.0;
+		centerZ = (extents[5]+extents[2])/2.0;
+		//calculate the  
+		var r = 1.1*Math.sqrt(Math.pow(extents[3] - centerX, 2)+ Math.pow(extents[4] - centerY, 2) + Math.pow(extents[5] - centerZ, 2));
 	}else{
 		r=1;
 	}
@@ -230,7 +306,8 @@ function set_perspective_view(){
 	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
 
 	var eye = vec3(0.0, 0.0, zNear*1.4); 	// position at camera at XYZ
-	var at  = vec3(avg_x, avg_y, avg_z);		// center point of what is being looked at XYZ
+	var at  = vec3(centerX, centerY, centerZ);		// center point of what is being looked at XYZ
+	// var at  = vec3(0, 0, 0);		// center point of what is being looked at XYZ
 	var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
 	var viewMatrix = lookAt(eye, at, up);
 	var viewMatrixLoc = gl.getUniformLocation(program, "viewMatrix");
@@ -240,7 +317,7 @@ function set_perspective_view(){
 function set_point_size(){
 	//Specify the vertex size
 	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-	gl.uniform1f(offsetLoc, 2.0);
+	gl.uniform1f(offsetLoc, 7.5);
 }
 
 function set_rotation(){
@@ -310,23 +387,77 @@ function update_state_output() {
 	}
 
 	msg += "--------Translation-----------<br>";
-	msg += " X: "+dx.toFixed(3)+"<br>";
-	msg += " Y: "+dy.toFixed(3)+"<br>";
-	msg += " Z: "+dz.toFixed(3)+"<br>";
+	if (transPosX){
+		msg += " X: "+dx.toFixed(3)+" Status: +<br>";
+	}else if(transNegX){
+		msg += " X: "+dx.toFixed(3)+" Status: -<br>";
+	}else{
+		msg += " X: "+dx.toFixed(3)+" Status: <br>";
+	}
+	if (transPosY){
+		msg += " Y: "+dy.toFixed(3)+" Status: <br>";
+	}else if(transNegY){
+		msg += " Y: "+dy.toFixed(3)+" Status: <br>";
+	}else{
+		msg += " Y: "+dy.toFixed(3)+" Status: <br>";
+	}
+	if (transPosZ){
+		msg += " Z: "+dz.toFixed(3)+" Status: <br>";
+	}else if(transNegZ){
+		msg += " Z: "+dz.toFixed(3)+" Status: <br>";
+	}else{
+		msg += " Z: "+dz.toFixed(3)+" Status: <br>";
+	}
+	var rotPosX = false;
+	var rotNegX = false;
+	var rotPosY = false;
+	var rotNegY = false;
+	var rotPosZ = false;
+	var rotNegZ = false;
 
 	msg += "--------Rotation---------------<br>";
 	//rotations
-	msg += " Roll: " + theta.toFixed(0) + "<br>";
-	msg += " Pitch: " + beta.toFixed(0) + "<br>";
-	msg += " Yaw: " + gamma.toFixed(0) + "<br>";
+	if (rotPosX){
+		msg += " Roll: " + theta.toFixed(0) + " Status: + <br>";
+	}else if(rotNegX){
+		msg += " Roll: " + theta.toFixed(0) + " Status: - <br>";
+	}else{
+		msg += " Roll: " + theta.toFixed(0) + " Status: <br>";
+	}
+	if (rotPosY){
+		msg += " Pitch: " + beta.toFixed(0) + " Status: + <br>";
+	}else if(rotNegY){
+		msg += " Pitch: " + beta.toFixed(0) + " Status: - <br>";
+	}else{
+		msg += " Pitch: " + beta.toFixed(0) + " Status: <br>";
+	}
+	if (rotPosZ){
+		msg += " Yaw: " + gamma.toFixed(0) + " Status: + <br>";
+	}else if(rotNegZ){
+		msg += " Yaw: " + gamma.toFixed(0) + " Status: - <br>";
+	}else{
+		msg += " Yaw: " + gamma.toFixed(0) + " Status: <br>";
+	}
+	
 	document.getElementById("meshState").innerHTML = msg;
 }
 
 function process_keypress(theKey) {
 	// function to toggle modes,
+	var outputMessage = '';
 
 	//on key presses, do change the colors or modes
 	switch (theKey) {
+		case 'D':
+		case 'd':
+			// Translate your wireframe in the + x direction.
+			if (drawNormal == false){
+				drawNormal = true;
+			}else{
+				drawNormal = false;
+			}
+			break;
+
 		case 'X':
 		case 'x':
 			// Translate your wireframe in the + x direction.
@@ -501,29 +632,32 @@ function process_keypress(theKey) {
 			pulseIndex = 0;
 			break;
 		default:
-			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message
-			outputMessage += 'Current keypress actions are: <br>';
-			outputMessage += '-Translations: <br>';
-			outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the + x direction. <br>";
-			outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the - x direction.<br>";
-			outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the + y direction.<br>";
-			outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the - y direction.<br>";
-			outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the + z direction. <br>";
-			outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the - z direction.<br>";
-			outputMessage += '-Rotations: <br>';
-			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an + roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' T ' or ' T ' Rotate your wireframe in an - roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' O ' or ' o ' Rotate your wireframe in an + pitch about it's CURRENT position.<br>";
-			outputMessage += "-- ' P ' or ' p ' Rotate your wireframe in an - pitch about it's CURRENT position.<br>";
-			outputMessage += "-- ' K ' or ' k ' Rotate your wireframe in an + yaw about it's CURRENT position.<br>";
-			outputMessage += "-- ' L ' or ' l ' Rotate your wireframe in an - yaw about it's CURRENT position.<br>";
-			outputMessage += '-Pulse <br>';
-			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
-			outputMessage += '-Reset <br>';
-			outputMessage += "-- ' Q ' or ' q ' Turns off translations/rotations. <br>";
-			outputMessage += "-- ' W ' or ' w ' Resets the mesh to the orgin. <br>";
-			document.getElementById('pageContent').innerHTML = outputMessage;
+			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message			
 	}
+
+	outputMessage = 'Current keypress actions are: <br>';
+	outputMessage += '- Translations: <br>';
+	outputMessage += "-- ' X ' or ' x ' Translate your wireframe in the + x direction. <br>";
+	outputMessage += "-- ' C ' or ' c ' Translate your wireframe in the - x direction.<br>";
+	outputMessage += "-- ' y ' or ' y ' Translate your wireframe in the + y direction.<br>";
+	outputMessage += "-- ' U ' or ' u ' Translate your wireframe in the - y direction.<br>";
+	outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the + z direction. <br>";
+	outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the - z direction.<br>";
+	outputMessage += '- Rotations: <br>';
+	outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an + roll about it's CURRENT position.<br>";
+	outputMessage += "-- ' T ' or ' T ' Rotate your wireframe in an - roll about it's CURRENT position.<br>";
+	outputMessage += "-- ' O ' or ' o ' Rotate your wireframe in an + pitch about it's CURRENT position.<br>";
+	outputMessage += "-- ' P ' or ' p ' Rotate your wireframe in an - pitch about it's CURRENT position.<br>";
+	outputMessage += "-- ' K ' or ' k ' Rotate your wireframe in an + yaw about it's CURRENT position.<br>";
+	outputMessage += "-- ' L ' or ' l ' Rotate your wireframe in an - yaw about it's CURRENT position.<br>";
+	outputMessage += '- Pulse <br>';
+	outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
+	outputMessage += '- Normals <br>';
+	outputMessage += "-- ' D ' or ' d ' Toggle normal lines. <br>";
+	outputMessage += '- Reset <br>';
+	outputMessage += "-- ' Q ' or ' q ' Turns off translations/rotations. <br>";
+	outputMessage += "-- ' W ' or ' w ' Resets the mesh to the orgin. <br>";
+	document.getElementById('pageContent').innerHTML = outputMessage;
 	update_state_output();
 }
 
@@ -677,7 +811,6 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 			}
 		}
 	}
-	animationDelay *= 1/polygonIndexList.length;
 	// display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
@@ -751,20 +884,36 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		var a = polygonIndexList[i][1]
 		var b = polygonIndexList[i][2]
 		var c = polygonIndexList[i][3]
-		var indices = [ a, b, c, a, c, b ];
-		for (var ii = 0; ii < indices.length-2; ++ii ){
+		var indices = [ a, b, c, a ];
+		for (var ii = 0; ii < indices.length; ++ii ){
 			polygon[0][ii] = vertexCoordsList[indices[ii]];		// vertices list
 			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   			// color list
 		}
 		polygon[2] = normal_newell_method(polygon[0]);			// normal
-		polygon[3] = vec3(0.0,0.0,0.01);   					// displacement
+		polygon[3] = vec3(0.0,0.0,0.01);   						// displacement
 		polygon[4] = 0;											// alpha
-		polygon[5] = 1;											// directionality constant	
+		polygon[5] = triangle_centroid(polygon[0],polygon[2]);	// directionality constant	
 		polygon[6] = polygon_pulse(polygon[0],polygon[2]);		// list of normal displacment
 		polygons[i] = polygon;									//store polygon in the array
 	}
 	return polygons;
 }
+
+function triangle_centroid(polygon,normal){
+	var originX = (polygon[0][0]+polygon[1][0]+polygon[2][0])/3;
+	var originY = (polygon[0][1]+polygon[1][1]+polygon[2][1])/3;
+	var originZ = (polygon[0][2]+polygon[1][2]+polygon[2][2])/3;
+	var centroid = vec4(originX,
+						originY,
+						originZ,
+						1);	
+	var centroidLine = vec4(originX + normalLineScale*normal[0],
+							originY + normalLineScale*normal[1],
+							originZ + normalLineScale*normal[2],
+							1);	
+	return [centroid,centroidLine];
+}
+
 function polygon_pulse(polygon,normal){
 	/*
 		Displaces a polygon a using the following equation: 		c*n*sin(alpha)*100
@@ -775,14 +924,13 @@ function polygon_pulse(polygon,normal){
 	var normalDisplacement = 0;
 	var alpha =0.01;
 	var direction = 1;
+
 	while (alpha >0){
 		normalDisplacement = Math.sin(alpha);
-		
 		if (alpha>=0.05){  
 			direction *= -1; // multiply by the directionality constant
 		}
 		alpha +=0.01*direction;
-
 		displacements.push(vec3(
 			pulseScale*normal[0]*normalDisplacement*100, 	//x
 			pulseScale*normal[1]*normalDisplacement*100, 	//y

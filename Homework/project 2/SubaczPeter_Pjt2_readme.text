@@ -20,8 +20,11 @@ During ingest the parser will attempt to find the ply header tag, number
     manual fixing before processing. Warning messages will occur if processed 
     vertices and polygons do not match what is listed in the header. The program 
     will continue with the warning displayed. The parse will only be trigger on 
-    a successful uplod of a ply file
+    a successful upload of a ply file.
 
 During the perspective setting, a unit sphere will be with a radius defined by the
-    extents of a model will be calucalated. the radius will be used to calculate the 
+    extents of a model will be calucalated. the radius will be used to calculate the
+
+
+
     

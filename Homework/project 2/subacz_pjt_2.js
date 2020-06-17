@@ -1,40 +1,67 @@
 /*
  * Some comments quoted from WebGL Programming Guide
  * by Matsuda and Lea, 1st edition.
- * 
- * @author Joshua Cuneo
+*
  * @author Peter Subacz
  * 
  * using multiple draw calls example: https://webglfundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
  * strats to draw multiple objects to a screen: 
+ * 
+ * This program allows a user to upload a ply file and draw that file as a polygon mesh to the screen. The mesh
+ * 	can then be translated in the x,y, or z direction as well as be rotated around the roll, pitch, and yaw
+ * 	axis. 
+ * 
+ * A breathing animation can be enabled that will displace a polygon about its surface normal. 
+ * 
+ * Note: this program is extremely computationally heavy with regards to the breathing animation.
+ * 
+ * features:
+ *  Parse a .ply file 
+ * 	Translate around the XYZ:
+ * 		Press ' X ' or ' x ' Translate your wireframe in the + x
+ * 		Press ' C ' or ' c ' Translate your wireframe in the - x
+ * 		Press ' y ' or ' y ' Translate your wireframe in the + y
+ * 		Press ' U ' or ' u ' Translate your wireframe in the - y
+ * 		Press ' Z ' or ' z ' Translate your wireframe in the + z
+ * 		Press ' A ' or ' a ' Translate your wireframe in the - z
+ * 	Rotate around the Roll,Pitch,Yaw
+ * 		Press ' R ' or ' r ' Rotate your wireframe in an + Roll
+ * 		Press ' R ' or ' r ' Rotate your wireframe in an + Roll
+ * 		Press ' T ' or ' T ' Rotate your wireframe in an - Pitch
+ * 		Press ' O ' or ' o ' Rotate your wireframe in an + Pitch
+ * 		Press ' K ' or ' k ' Rotate your wireframe in an + Yaw
+ * 		Press ' L ' or ' l ' Rotate your wireframe in an - Yaw
+ * 	Breathing animation
+ * 		Press ' B ' or ' b ' to toggle the breathing (pulsing).
+ * 	Reset rotations and Translations
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
  */
-
 
 // global variables
 var gl;
 var program;
-var points;
-var colors;
 var extents;
 var canvas;
 var id;
-
+var rotMatrix;
+var translateMatrix;
 var polygons = [];
-
 var key = '';
-
 var theta = 0; 	//degrees x rotation
 var beta = 0;	//degrees y rotation
 var gamma = 0;	//degrees z rotation
 var dx = 0;		//units x translation
 var dy = 0;		//units y translation
 var dz = 0;		//units z translation
-
 var c = 0.005;
 var pulse_scale = 0.9;
 var pulse_delay = 1; //time in ms
 var disp = 0;
-
 var x = 0.0;
 var y = 0.0;
 var z = 0.0;
@@ -43,7 +70,6 @@ var zFar = 100;
 var avg_x = 1;
 var avg_y = 1;
 var avg_z = 1;
-
 var animation = true;
 var pulse = false;
 var rotPosX = false;
@@ -59,24 +85,17 @@ var transNegX = false;
 var transNegY = false;
 var transNegZ = false;
 
-function dot_product(vector1, vector2) {
-	//https://www.w3resource.com/javascript-exercises/javascript-basic-exercise-108.php
-	var result = 0;
-	for (var i = 0; i < 3; i++) {
-	  result += vector1[i] * vector2[i];
-	}
-	return result;
-  }
-  
 function main() {
 	update_state_output(); // update the status box with current status
+	process_keypress(' '); // show the possible inputs
+	window.onkeypress = function (event) { //when a key is pressed, process the input
+		process_keypress(event.key)
+	}
 
 	// Add the event listener to parse input file
 	document.getElementById('ply-file').addEventListener('change', function () {
 		var fileReader = new FileReader();
 		fileReader.onload = function (e) {
-			points = [];
-			colors = [];
 			extents = [];
 			polygons = [];
 			var vertexCoordsList = []; // list of vertex cordinates 
@@ -84,117 +103,136 @@ function main() {
 			extents = [];
 			[vertexCoordsList, polygonIndexList, extents] = parse_ply_file(vertexCoordsList, polygonIndexList, fileReader.result);
 			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
+			init();
 			render();
 		}
 		fileReader.readAsText(this.files[0]);
 	})
-
-
-
-	init();
-	process_keypress(' ');
-	window.onkeypress = function (event) {
-		process_keypress(event.key)
-	}
 }
 
 function init(){
-	// Retrieve <canvas> element
-	canvas = document.getElementById('webgl');
-
-	// Get the rendering context for WebGL
-	gl = WebGLUtils.setupWebGL(canvas, undefined);
-
+	/*
+		Initialize webgl, and set: viewports, cameras, points
+	*/
+	canvas = document.getElementById('webgl');// Retrieve <canvas> element
+	gl = WebGLUtils.setupWebGL(canvas, undefined);	// Get the rendering context for WebGL
 	if (!gl) {
 		console.log('Failed to get the rendering context for WebGL');
 		return;
 	}
+
 	// Initialize shaders
 	// This function call will create a shader, upload the GLSL source, and compile the shader
 	program = initShaders(gl, "vshader", "fshader");
+	gl.useProgram(program);		// Setup camera
 
-}
-var rotMatrix;
-
-function render(){   
-	init();
 	// Tell WebGL how to convert from clip space to pixels
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-	// Turn on culling. By default backfacing triangles
-	gl.enable(gl.CULL_FACE);
-	gl.enable(gl.DEPTH_TEST);
+	gl.enable(gl.CULL_FACE);	//enable culling - default backfacing triangles
+	gl.enable(gl.DEPTH_TEST);	//enable depth testing
+	set_perspective_view();		//set the camera
+	set_point_size();			//set the point size
+}
+
+function render(){   
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	// We tell WebGL which shader program to execute.
-	// Setup camera
-	gl.useProgram(program);
-	set_perspective_view();
+
 	set_rotation();			// set rotation if active
 	set_translation(); 		// set translation if active
-	rotMatrix = mult(mult(rotateX(theta),rotateY(beta)),rotateZ(gamma));
+	
+	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));
+	
 	for(var i = 0; i < polygons.length; ++i) {
-		var vBuffer = gl.createBuffer();
+		var vBuffer = gl.createBuffer();		// Create vertex buffer
 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STREAM_DRAW);
-
 		//Get the location of the shader's vPosition attribute in the GPU's memory
 		var vPosition = gl.getAttribLocation(program, "vPosition");
 		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
 		gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
 
-		var cBuffer = gl.createBuffer();
+		var cBuffer = gl.createBuffer();		// Create color buffer
 		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STREAM_DRAW);
-	
+		//Get the location of the shader's vColor attribute in the GPU's memory
 		var vColor = gl.getAttribLocation(program, "vColor");
 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(vColor);
+		gl.enableVertexAttribArray(vColor);//Turns the attribute on
 
 		if(pulse){ 
-			polygon_pulse(i);
+			polygon_pulse(i);	
 		}
-		
-		var translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
+
+		translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
 		var ctMatrix = mult(translateMatrix, rotMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-		
 		gl.drawArrays(gl.LINE_LOOP, 0, polygons[1][0].length);
 		update_state_output()
 	}
-	if(animation){
-		id = requestAnimationFrame(render);
-	}
+
+	// if (show_normals){
+	// 	for(var i = 0; i < polygons.length; ++i) {
+	// 		var vBuffer = gl.createBuffer();		// Create vertex buffer
+	// 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	// 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STREAM_DRAW);
+	// 		//Get the location of the shader's vPosition attribute in the GPU's memory
+	// 		var vPosition = gl.getAttribLocation(program, "vPosition");
+	// 		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	// 		gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
+	
+	// 		var cBuffer = gl.createBuffer();		// Create color buffer
+	// 		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+	// 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STREAM_DRAW);
+	// 		//Get the location of the shader's vColor attribute in the GPU's memory
+	// 		var vColor = gl.getAttribLocation(program, "vColor");
+	// 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+	// 		gl.enableVertexAttribArray(vColor);//Turns the attribute on
+	
+	// 		if(pulse){ 
+	// 			polygon_pulse(i);	
+	// 		}
+	
+	// 		translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
+	// 		var ctMatrix = mult(translateMatrix, rotMatrix);
+	// 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	
+	// 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+	// 		gl.drawArrays(gl.LINE_LOOP, 0, polygons[1][0].length);
+	// 		update_state_output()
+	// 	}
+
+	// }
+	id = requestAnimationFrame(render);
 }
 
 function polygon_pulse(i){
 	/*
 		Displaces a polygon a using the following equation: 		c*n*sin(alpha)*100
 			where: c is the scaling factor, n is the normal, sin(alpha) is the direction. Alpha is scaled between 
-			0.0 -> pi/16. When alpha exceeds each limit the directional
-
+			0.0 -> pi/16. When alpha exceeds each limit the directional is changed to reverse the interpolation.
 	*/
 	polygons[i][4]+=0.01*polygons[i][5]; // multiply by the directionality constant
 
 	disp = Math.sin(polygons[i][4]); 	 // get displacement
-	//translate
-	var tr = translate(c*polygons[i][2][0]*disp*100, c*polygons[i][2][1]*disp*100, c*polygons[i][2][2]*disp*100,1)
-	// correct the translation relevative the any rotations
-	var tem = mult(rotMatrix,tr);
-	// points in x,y,z
-	polygons[i][3][0] = tem[0][3];
-	polygons[i][3][1] = tem[1][3];
-	polygons[i][3][2] = tem[2][3];
 
-	var pr = Math.sqrt(Math.pow(polygons[i][3][0],2)+Math.pow(polygons[i][3][1],2)+Math.pow(polygons[i][3][2],2));
-	if (polygons[i][4]>=(Math.PI/16) || polygons[i][4]<=-0.0){  //0.382 is pi/8
+	// translate & correct the translation relevative the any rotations
+	var tem = mult(rotMatrix,translate(c*polygons[i][2][0]*disp*100, c*polygons[i][2][1]*disp*100, c*polygons[i][2][2]*disp*100,1));
+
+	polygons[i][3][0] = tem[0][3]; // set pulse x dir
+	polygons[i][3][1] = tem[1][3]; // set pulse y dir
+	polygons[i][3][2] = tem[2][3]; // set pulse z dir
+	if (polygons[i][4]>=(Math.PI/16) || polygons[i][4]<=0.0){  //0.382 is pi/8
 		polygons[i][5] *= -1
 	}
-	// sleep(pulse_delay);
 }
 
 function set_perspective_view(){
-	//https://community.khronos.org/t/automatically-center-3d-object/20892/6
+	/*
+	
+	*/
 
 	// use the extents to make a bounding sphere
 	if (extents.length){
@@ -202,21 +240,19 @@ function set_perspective_view(){
 		avg_y = (extents[4]+extents[1])/2.0;
 		avg_z = (extents[5]+extents[2])/2.0;
 		//calcualte the radius 
-		
 		var r = Math.sqrt(Math.pow(extents[3] - avg_x, 2)+ Math.pow(extents[4] - avg_y, 2) + Math.pow(extents[5] - avg_z, 2));
 	}else{
 		r=1;
 	}
 
-	var fieldOfView = 60;					//assumed to be 90 for now
+	var fieldOfView = 60;
 	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-
 	var fDistance = r / Math.tan(fieldOfView); 
 
 	zNear = fDistance - r;
 	zFar = fDistance + r;
 	
-	var thisProj = perspective(fieldOfView, aspect, zNear, zFar);
+	var thisProj = perspective(fieldOfView, aspect, zNear*0.1, zFar*1.1);
 
 	var projMatrix = gl.getUniformLocation(program, 'projMatrix');
 	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
@@ -241,23 +277,23 @@ function set_point_size(){
 function set_rotation(){
 	// camera transforms
 	if (rotPosX){
-		theta += 5;
+		theta += 15;
 	}else if (rotNegX){
-		theta -= 5;
+		theta -= 15;
 	}else{
 		//do nothing
 	}
 	if (rotPosY){
-		beta += 5;
+		beta += 15;
 	}else if (rotNegY){
-		beta -= 5;
+		beta -= 15;
 	}else{
 		//do nothing
 	}
 	if (rotPosZ){
-		gamma += 5;
+		gamma += 15;
 	}else if (rotNegZ){
-		gamma -= 5;
+		gamma -= 15;
 	}else{
 		//do nothing
 	}
@@ -274,35 +310,27 @@ function set_rotation(){
 
 function set_translation(){
 	if( transPosX== true){
-		dx += 0.001;
+		dx += 0.005;
 	}else if(transNegX== true){
-		dx -= 0.001;
+		dx -= 0.005;
 	}else{
 		//do nothing
 	}
 	if(transPosY == true){
-		dy += 0.001;
+		dy += 0.005;
 	}else if(transNegY == true){
-		dy -= 0.001;
+		dy -= 0.005;
 	}else{
 		//do nothing
 	}
 	if(transPosZ == true){
-		dz += 0.001;
+		dz += 0.005;
 	}else if(transNegZ== true){
-		dz -= 0.001;
+		dz -= 0.005;
 	}else{
 		//do nothing
 	}
 }
-
-function sleep(milliseconds) {
-	const date = Date.now();
-	let currentDate = null;
-	do {
-	  currentDate = Date.now();
-	} while (currentDate - date < milliseconds);
-  }
 
 function update_state_output() {
 	msg = "";
@@ -319,9 +347,9 @@ function update_state_output() {
 
 	msg += "--------Rotation---------------<br>";
 	//rotations
-	msg += " Roll: " + theta.toFixed(1) + "<br>";
-	msg += " Pitch: " + beta.toFixed(1) + "<br>";
-	msg += " Yaw: " + gamma.toFixed(1) + "<br>";
+	msg += " Roll: " + theta.toFixed(0) + "<br>";
+	msg += " Pitch: " + beta.toFixed(0) + "<br>";
+	msg += " Yaw: " + gamma.toFixed(0) + "<br>";
 
 	msg += "--------Pulse---------------<br>";
 	//rotations
@@ -411,6 +439,7 @@ function process_keypress(theKey) {
 			break;
 		case 'T':
 		case 't':
+
 			//Rotate your wireframe in an -X-roll about it's CURRENT position.
 			if (rotNegX == false){
 				rotNegX = true;
@@ -419,7 +448,7 @@ function process_keypress(theKey) {
 				rotNegX = false;
 			}
 			break;
-
+		
 		case 'O':
 		case 'o':
 			//Rotate your wireframe in an +Y-roll about it's CURRENT position.
@@ -430,7 +459,6 @@ function process_keypress(theKey) {
 				rotPosY = false;
 			}
 			break;
-
 		case 'P':
 		case 'p':
 			//Rotate your wireframe in an -Y-roll about it's CURRENT position.
@@ -515,12 +543,12 @@ function process_keypress(theKey) {
 			outputMessage += "-- ' Z ' or ' z ' Translate your wireframe in the + z direction. <br>";
 			outputMessage += "-- ' A ' or ' a ' Translate your wireframe in the - z direction.<br>";
 			outputMessage += '-Rotations: <br>';
-			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an + X-roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' T ' or ' T ' Rotate your wireframe in an - X-roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' O ' or ' o ' Rotate your wireframe in an + Y-roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' P ' or ' p ' Rotate your wireframe in an - Y-roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' K ' or ' k ' Rotate your wireframe in an + Z-roll about it's CURRENT position.<br>";
-			outputMessage += "-- ' L ' or ' l ' Rotate your wireframe in an - Z-roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' R ' or ' r ' Rotate your wireframe in an + roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' T ' or ' T ' Rotate your wireframe in an - roll about it's CURRENT position.<br>";
+			outputMessage += "-- ' O ' or ' o ' Rotate your wireframe in an + pitch about it's CURRENT position.<br>";
+			outputMessage += "-- ' P ' or ' p ' Rotate your wireframe in an - pitch about it's CURRENT position.<br>";
+			outputMessage += "-- ' K ' or ' k ' Rotate your wireframe in an + yaw about it's CURRENT position.<br>";
+			outputMessage += "-- ' L ' or ' l ' Rotate your wireframe in an - yaw about it's CURRENT position.<br>";
 			outputMessage += '-Pulse <br>';
 			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
 			outputMessage += '-Reset <br>';
@@ -603,8 +631,6 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 	polygonIndexList = [];			// clear the polygon list
 	var endHeader = false;			// bool end of header marker
 	var plyDataType = false;		// bool ply designation present in file header
-	var numberVertices = 0;			// int number for vertices metadata
-	var numberPolygons = 0;			// int number for polygons metadata
 	var vertexIndex = 0;			// int index of vertices
 	var polygonIndex = 0;			// int index of polygon
 	var x_max = 0;
@@ -682,8 +708,7 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 			}
 		}
 	}
-	// delay*=polygonIndexList.length; // set the delay by 1/polygons =  few polygons, should pulse slower
-	display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
+	// display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
 
@@ -693,17 +718,17 @@ function normal_newell_method(vectors){
 
 		returns [m_x,m_y,m_z]
 	*/
-	
+
 	var normal = vec3(0.0,0.0,0.0); // [m_x,m_y,m_z]
-	//mx
+
+	//mx - sum(y-y_1)*(z+z_1)
 	var sum = 0;
 		for(ii=0;ii<vectors.length-1;ii++){	
 			sum += (vectors[ii][1]-vectors[ii+1][1])*
 				(vectors[ii][2]+vectors[ii+1][2]);	
 		}
 	normal[0] = sum;
-
-	//my
+	//my - sum(z-z_1)*(x+x_1)
 	var sum = 0;
 		for(ii=0;ii<vectors.length-1;ii++){	
 			sum += (vectors[ii][2]-vectors[ii+1][2])*
@@ -711,7 +736,7 @@ function normal_newell_method(vectors){
 		}
 	normal[1] = sum
 	
-	//mz
+	//mz - sum(x-x_1)*(y+y_1)
 	var sum = 0;
 		for(ii=0;ii<vectors.length-1;ii++){	
 			sum += (vectors[ii][0]-vectors[ii+1][0])*
@@ -741,7 +766,8 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 				]
 				normal = vec4();
 				displacement=vec4();
-				zeta = 0;
+				alpha =0;
+				directionality = 1;
 				]
 			],
 		 ]
@@ -759,11 +785,11 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 			polygon[0][ii] = vertexCoordsList[indices[ii]];		// vertices list
 			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   			// color list
 		}
-		polygon[2] = normal_newell_method(polygon[0]);			//normal
-		polygon[3] = vec4(0.0,0.0,0.0,0.0);   					//displacement
-		polygon[4] = 0;
-		polygon[5] = 1;
-		polygons[i] = polygon;
+		polygon[2] = normal_newell_method(polygon[0]);			// normal
+		polygon[3] = vec3(0.0,0.0,0.0,0.0);   					// displacement
+		polygon[4] = 0;											// alpha
+		polygon[5] = 1;											// directionality constant	
+		polygons[i] = polygon;									//store polygon in the array
 	}
 	return polygons;
 }

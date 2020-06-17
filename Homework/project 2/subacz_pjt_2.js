@@ -34,6 +34,8 @@
  * 	Breathing animation
  * 		Press ' B ' or ' b ' to toggle the breathing (pulsing).
  * 	Reset rotations and Translations
+ * 		Press ' Q ' or ' q ' to turn off active modes (pulsing).
+ * 		Press ' W ' or ' w ' to reset model to origin
  * 
  * 
  * 
@@ -48,29 +50,36 @@ var program;
 var extents;
 var canvas;
 var id;
-var rotMatrix;
-var translateMatrix;
-var polygons = [];
-var key = '';
+//------------------
+var rotMatrix;	//rotaton matrix
+var translateMatrix;		//translation matrix
+
+var polygons = [];	//list of polygons see function <construct_polygon_points> for me detail
+var key = '';	//key press string
+
 var theta = 0; 	//degrees x rotation
 var beta = 0;	//degrees y rotation
 var gamma = 0;	//degrees z rotation
+var disp = 0.01;//unit displacement
 var dx = 0;		//units x translation
 var dy = 0;		//units y translation
 var dz = 0;		//units z translation
-var c = 0.005;
-var pulse_scale = 0.9;
-var pulse_delay = 1; //time in ms
-var disp = 0;
-var x = 0.0;
-var y = 0.0;
-var z = 0.0;
+
+var pulseScale = 0.05;	//pulse scale
+var pulseIndex = 0;	//pulse index for animation
+
+var animationDelay = 1000;	//sleep delay in ms
+
+var perspectiveScale = 0.1;
 var zNear = 0.1;
 var zFar = 100;
 var avg_x = 1;
 var avg_y = 1;
 var avg_z = 1;
+
+//control bools
 var animation = true;
+var initSleep = true;
 var pulse = false;
 var rotPosX = false;
 var rotNegX = false;
@@ -132,6 +141,10 @@ function init(){
 	gl.enable(gl.DEPTH_TEST);	//enable depth testing
 	set_perspective_view();		//set the camera
 	set_point_size();			//set the point size
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);	// Set clear color
+	if(initSleep){
+		sleep(10)
+	}
 }
 
 function render(){   
@@ -141,8 +154,16 @@ function render(){
 	set_rotation();			// set rotation if active
 	set_translation(); 		// set translation if active
 	
-	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));
-	
+	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));// calculate the new rotation per render
+	if (pulse){
+		
+		if (pulseIndex<polygons[0][6].length-1){
+			pulseIndex+=1;
+		}else{
+			pulseIndex = 0;
+		}
+	}
+
 	for(var i = 0; i < polygons.length; ++i) {
 		var vBuffer = gl.createBuffer();		// Create vertex buffer
 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -159,13 +180,9 @@ function render(){
 		var vColor = gl.getAttribLocation(program, "vColor");
 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 		gl.enableVertexAttribArray(vColor);//Turns the attribute on
-
-		if(pulse){ 
-			polygon_pulse(i);	
-		}
-
-		translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
-		var ctMatrix = mult(translateMatrix, rotMatrix);
+		
+		translateMatrix = translate(dx+polygons[i][6][pulseIndex][0], dy+polygons[i][6][pulseIndex][1], dz+polygons[i][6][pulseIndex][2]);
+		var ctMatrix = mult(rotMatrix,translateMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
@@ -173,67 +190,22 @@ function render(){
 		update_state_output()
 	}
 
-	// if (show_normals){
-	// 	for(var i = 0; i < polygons.length; ++i) {
-	// 		var vBuffer = gl.createBuffer();		// Create vertex buffer
-	// 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	// 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STREAM_DRAW);
-	// 		//Get the location of the shader's vPosition attribute in the GPU's memory
-	// 		var vPosition = gl.getAttribLocation(program, "vPosition");
-	// 		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	// 		gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
-	
-	// 		var cBuffer = gl.createBuffer();		// Create color buffer
-	// 		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-	// 		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STREAM_DRAW);
-	// 		//Get the location of the shader's vColor attribute in the GPU's memory
-	// 		var vColor = gl.getAttribLocation(program, "vColor");
-	// 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-	// 		gl.enableVertexAttribArray(vColor);//Turns the attribute on
-	
-	// 		if(pulse){ 
-	// 			polygon_pulse(i);	
-	// 		}
-	
-	// 		translateMatrix = translate(dx+polygons[i][3][0], dy+polygons[i][3][1], dz+polygons[i][3][2]);
-	// 		var ctMatrix = mult(translateMatrix, rotMatrix);
-	// 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	
-	// 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-	// 		gl.drawArrays(gl.LINE_LOOP, 0, polygons[1][0].length);
-	// 		update_state_output()
-	// 	}
-
-	// }
 	id = requestAnimationFrame(render);
-}
-
-function polygon_pulse(i){
-	/*
-		Displaces a polygon a using the following equation: 		c*n*sin(alpha)*100
-			where: c is the scaling factor, n is the normal, sin(alpha) is the direction. Alpha is scaled between 
-			0.0 -> pi/16. When alpha exceeds each limit the directional is changed to reverse the interpolation.
-	*/
-	polygons[i][4]+=0.01*polygons[i][5]; // multiply by the directionality constant
-
-	disp = Math.sin(polygons[i][4]); 	 // get displacement
-
-	// translate & correct the translation relevative the any rotations
-	var tem = mult(rotMatrix,translate(c*polygons[i][2][0]*disp*100, c*polygons[i][2][1]*disp*100, c*polygons[i][2][2]*disp*100,1));
-
-	polygons[i][3][0] = tem[0][3]; // set pulse x dir
-	polygons[i][3][1] = tem[1][3]; // set pulse y dir
-	polygons[i][3][2] = tem[2][3]; // set pulse z dir
-	if (polygons[i][4]>=(Math.PI/16) || polygons[i][4]<=0.0){  //0.382 is pi/8
-		polygons[i][5] *= -1
+	if (animationDelay>0.001){
+		sleep(animationDelay);
 	}
 }
+function sleep( sleepDuration ){
+	// apperently JS does not have a sleep utility
+    var now = new Date().getTime();
+    while(new Date().getTime() < now + sleepDuration){ /* do nothing */ } 
+}
+
 
 function set_perspective_view(){
 	/*
 	
 	*/
-
 	// use the extents to make a bounding sphere
 	if (extents.length){
 		avg_x = (extents[3]+extents[0])/2.0;
@@ -247,18 +219,15 @@ function set_perspective_view(){
 
 	var fieldOfView = 60;
 	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-	var fDistance = r / Math.tan(fieldOfView); 
+	var zDisplacement = r / Math.tan(fieldOfView); 
 
-	zNear = fDistance - r;
-	zFar = fDistance + r;
+	zNear = zDisplacement - r;
+	zFar = zDisplacement + r;
 	
-	var thisProj = perspective(fieldOfView, aspect, zNear*0.1, zFar*1.1);
+	var thisProj = perspective(fieldOfView, aspect, (zNear*perspectiveScale), zFar*(1+perspectiveScale));
 
 	var projMatrix = gl.getUniformLocation(program, 'projMatrix');
 	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
-
-	// Set clear color
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
 	var eye = vec3(0.0, 0.0, zNear*1.4); 	// position at camera at XYZ
 	var at  = vec3(avg_x, avg_y, avg_z);		// center point of what is being looked at XYZ
@@ -310,23 +279,23 @@ function set_rotation(){
 
 function set_translation(){
 	if( transPosX== true){
-		dx += 0.005;
+		dx += disp;
 	}else if(transNegX== true){
-		dx -= 0.005;
+		dx -= disp;
 	}else{
 		//do nothing
 	}
 	if(transPosY == true){
-		dy += 0.005;
+		dy += disp;
 	}else if(transNegY == true){
-		dy -= 0.005;
+		dy -= disp;
 	}else{
 		//do nothing
 	}
 	if(transPosZ == true){
-		dz += 0.005;
+		dz += disp;
 	}else if(transNegZ== true){
-		dz -= 0.005;
+		dz -= disp;
 	}else{
 		//do nothing
 	}
@@ -350,10 +319,6 @@ function update_state_output() {
 	msg += " Roll: " + theta.toFixed(0) + "<br>";
 	msg += " Pitch: " + beta.toFixed(0) + "<br>";
 	msg += " Yaw: " + gamma.toFixed(0) + "<br>";
-
-	msg += "--------Pulse---------------<br>";
-	//rotations
-	msg += " Disp: " + disp.toFixed(3) + "<br>";
 	document.getElementById("meshState").innerHTML = msg;
 }
 
@@ -518,6 +483,12 @@ function process_keypress(theKey) {
 			rotPosY = false;
 			rotNegZ = false;
 			rotPosZ = false;
+			//pulse settings
+			t = 0
+			pulse = false;
+			break;		
+		case 'W':
+		case 'w':
 			//reset translations
 			dx = 0;
 			dy = 0;
@@ -526,12 +497,9 @@ function process_keypress(theKey) {
 			theta = 0;
 			beta = 0;
 			gamma = 0;
-
-			//pulse settings
-			t = 0
-			pulse = false;
-
-			break;		
+			//reset pulse
+			pulseIndex = 0;
+			break;
 		default:
 			var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message
 			outputMessage += 'Current keypress actions are: <br>';
@@ -552,7 +520,8 @@ function process_keypress(theKey) {
 			outputMessage += '-Pulse <br>';
 			outputMessage += "-- ' B ' or ' b ' Toggle pulsing meshes. <br>";
 			outputMessage += '-Reset <br>';
-			outputMessage += "-- ' Q ' or ' q ' Resets the mesh to the orgin and turns off translations/rotations <br>";
+			outputMessage += "-- ' Q ' or ' q ' Turns off translations/rotations. <br>";
+			outputMessage += "-- ' W ' or ' w ' Resets the mesh to the orgin. <br>";
 			document.getElementById('pageContent').innerHTML = outputMessage;
 	}
 	update_state_output();
@@ -708,6 +677,7 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 			}
 		}
 	}
+	animationDelay *= 1/polygonIndexList.length;
 	// display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
@@ -768,6 +738,7 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 				displacement=vec4();
 				alpha =0;
 				directionality = 1;
+				p
 				]
 			],
 		 ]
@@ -786,10 +757,36 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   			// color list
 		}
 		polygon[2] = normal_newell_method(polygon[0]);			// normal
-		polygon[3] = vec3(0.0,0.0,0.0,0.0);   					// displacement
+		polygon[3] = vec3(0.0,0.0,0.01);   					// displacement
 		polygon[4] = 0;											// alpha
 		polygon[5] = 1;											// directionality constant	
+		polygon[6] = polygon_pulse(polygon[0],polygon[2]);		// list of normal displacment
 		polygons[i] = polygon;									//store polygon in the array
 	}
 	return polygons;
+}
+function polygon_pulse(polygon,normal){
+	/*
+		Displaces a polygon a using the following equation: 		c*n*sin(alpha)*100
+			where: c is the scaling factor, n is the normal, sin(alpha) is the direction. Alpha is scaled between 
+			0.0 -> pi/16. When alpha exceeds each limit the directional is changed to reverse the interpolation.
+	*/
+	var displacements = [vec3((0.0,0.0,0.0))];
+	var normalDisplacement = 0;
+	var alpha =0.01;
+	var direction = 1;
+	while (alpha >0){
+		normalDisplacement = Math.sin(alpha);
+		
+		if (alpha>=0.05){  
+			direction *= -1; // multiply by the directionality constant
+		}
+		alpha +=0.01*direction;
+
+		displacements.push(vec3(
+			pulseScale*normal[0]*normalDisplacement*100, 	//x
+			pulseScale*normal[1]*normalDisplacement*100, 	//y
+			pulseScale*normal[2]*normalDisplacement*100)); //z
+	}
+	return displacements;
 }

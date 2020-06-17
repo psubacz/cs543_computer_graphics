@@ -103,7 +103,7 @@ function main() {
 	window.onkeypress = function (event) { //when a key is pressed, process the input
 		process_keypress(event.key)
 	}
-	
+
 	// Add the event listener to parse input file
 	document.getElementById('ply-file').addEventListener('change', function () {
 		var fileReader = new FileReader();
@@ -211,7 +211,7 @@ function render(){
 		gl.enableVertexAttribArray(vColor);//Turns the attribute on
 		
 		translateMatrix = translate(dx+polygons[i][6][pulseIndex][0], dy+polygons[i][6][pulseIndex][1], dz+polygons[i][6][pulseIndex][2]);
-		var ctMatrix = mult(rotMatrix,translateMatrix);
+		var ctMatrix = mult(translateMatrix,rotMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
@@ -234,35 +234,13 @@ function render(){
 			gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 			gl.enableVertexAttribArray(vColor);//Turns the attribute on
 			gl.drawArrays(gl.LINES, 0,2);
-
 		}
 		update_state_output()
 	}
 
-	// var cCenter = vec4(centerX,centerY,centerZ,1.0);
-	// var cColor = vec4(1.0,0.0,0.0,1)
-	
-	// translateMatrix = translate(0, 0, 0);
-	// var vBuffer = gl.createBuffer();		// Create vertex buffer
-	// gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	// gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
-	// //Get the location of the shader's vPosition attribute in the GPU's memory
-	// var vPosition = gl.getAttribLocation(program, "vPosition");
-	// gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	// gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
-
-	// var cBuffer = gl.createBuffer();		// Create color buffer
-	// gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-	// gl.bufferData(gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW);
-	// //Get the location of the shader's vColor attribute in the GPU's memory
-	// var vColor = gl.getAttribLocation(program, "vColor");
-	// gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-	// gl.enableVertexAttribArray(vColor);//Turns the attribute on
-	
-	// var ctMatrix = mult(translateMatrix,rotMatrix);
-	// var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	// gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-	// gl.drawArrays(gl.POINTS, 0,1);
+	if(true){
+		draw_center();
+	}
 
 	if (animation){
 		id = requestAnimationFrame(render);
@@ -270,6 +248,33 @@ function render(){
 	if (animationDelay>0.15){
 		sleep(animationDelay);
 	}
+}
+
+function draw_center(){
+	var cCenter = vec4(centerX,centerY,centerZ,1.0);
+	var cColor = vec4(1.0,0.0,0.0,1)
+	
+	translateMatrix = translate(0, 0, 0);
+	var vBuffer = gl.createBuffer();		// Create vertex buffer
+	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
+	//Get the location of the shader's vPosition attribute in the GPU's memory
+	var vPosition = gl.getAttribLocation(program, "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
+
+	var cBuffer = gl.createBuffer();		// Create color buffer
+	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW);
+	//Get the location of the shader's vColor attribute in the GPU's memory
+	var vColor = gl.getAttribLocation(program, "vColor");
+	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vColor);//Turns the attribute on
+	
+	var ctMatrix = mult(translateMatrix,rotMatrix);
+	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
+	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+	gl.drawArrays(gl.POINTS, 0,1);
 }
 
 function sleep( sleepDuration ){
@@ -378,7 +383,7 @@ function set_translation(){
 	}
 }
 
-function update_state_output() {
+function update_state_output(){
 	msg = "";
 	if (pulse == true){
 		msg += " Breathing: On<br>";
@@ -442,7 +447,7 @@ function update_state_output() {
 	document.getElementById("meshState").innerHTML = msg;
 }
 
-function process_keypress(theKey) {
+function process_keypress(theKey){
 	// function to toggle modes,
 	var outputMessage = '';
 
@@ -934,7 +939,7 @@ function polygon_pulse(polygon,normal){
 		displacements.push(vec3(
 			pulseScale*normal[0]*normalDisplacement*100, 	//x
 			pulseScale*normal[1]*normalDisplacement*100, 	//y
-			pulseScale*normal[2]*normalDisplacement*100)); //z
+			pulseScale*normal[2]*normalDisplacement*100)); 	//z
 	}
 	return displacements;
-}
+}``

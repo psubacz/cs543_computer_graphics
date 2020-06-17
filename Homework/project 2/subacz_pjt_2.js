@@ -52,6 +52,9 @@ var id;
 var rotMatrix;	//rotaton matrix
 var translateMatrix;		//translation matrix
 
+var points = [];
+var colors = [];
+
 var polygons = [];	//list of polygons see function <construct_polygon_points> for me detail
 var key = '';	//key press string
 
@@ -151,6 +154,8 @@ function init(){
 	if(initSleep){
 		sleep(10)
 	}
+
+				
 }
 
 function set_colors(colorIndex){
@@ -180,11 +185,11 @@ function set_colors(colorIndex){
 function render(){   
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	// We tell WebGL which shader program to execute.
-
 	set_rotation();			// set rotation if active
 	set_translation(); 		// set translation if active
 	
 	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));// calculate the new rotation per render
+
 	if (pulse){
 		if (pulseIndex<polygons[0][6].length-1){
 			pulseIndex+=1;
@@ -192,31 +197,37 @@ function render(){
 			pulseIndex = 0;
 		}
 	}
+	var i = 0
 
-	for(var i = 0; i < polygons.length; ++i) {
-		var vBuffer = gl.createBuffer();		// Create vertex buffer
-		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][0]), gl.STREAM_DRAW);
-		//Get the location of the shader's vPosition attribute in the GPU's memory
-		var vPosition = gl.getAttribLocation(program, "vPosition");
-		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
+	var vBuffer = gl.createBuffer();		// Create vertex buffer
+	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STREAM_DRAW);
+	//Get the location of the shader's vPosition attribute in the GPU's memory
+	var vPosition = gl.getAttribLocation(program, "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);
+	//Turns the attribute on
+	var cBuffer = gl.createBuffer();		// Create color buffer
+	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STREAM_DRAW);
+	//Get the location of the shader's vColor attribute in the GPU's memory
+	var vColor = gl.getAttribLocation(program, "vColor");
+	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vColor);//Turns the attribute on
 
-		var cBuffer = gl.createBuffer();		// Create color buffer
-		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][1]), gl.STREAM_DRAW);
-		//Get the location of the shader's vColor attribute in the GPU's memory
-		var vColor = gl.getAttribLocation(program, "vColor");
-		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(vColor);//Turns the attribute on
-		
-		translateMatrix = translate(dx+polygons[i][6][pulseIndex][0], dy+polygons[i][6][pulseIndex][1], dz+polygons[i][6][pulseIndex][2]);
-		var ctMatrix = mult(translateMatrix,rotMatrix);
+	while(i<(points.length)){
+		translateMatrix = translate(dx+polygons[i/4][6][pulseIndex][0], dy+polygons[i/4][6][pulseIndex][1], dz+polygons[i/4][6][pulseIndex][2]);
+		// var ctMatrix = mult(translateMatrix,rotMatrix);
+		var ctMatrix = mult(rotMatrix,translateMatrix);
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-		gl.drawArrays(gl.LINE_LOOP, 0, polygons[1][0].length);
 
+		gl.drawArrays(gl.LINE_LOOP, i, 4);
+		i+=4;
+		update_state_output()
+		
+	}
+	for(var i = 0; i < polygons.length; ++i) {
 		if(drawNormal){
 			var vBuffer = gl.createBuffer();		// Create vertex buffer
 			gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -235,7 +246,7 @@ function render(){
 			gl.enableVertexAttribArray(vColor);//Turns the attribute on
 			gl.drawArrays(gl.LINES, 0,2);
 		}
-		update_state_output()
+	
 	}
 
 	if(true){
@@ -892,7 +903,9 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		var indices = [ a, b, c, a ];
 		for (var ii = 0; ii < indices.length; ++ii ){
 			polygon[0][ii] = vertexCoordsList[indices[ii]];		// vertices list
-			polygon[1][ii]= [1.0, 1.0, 1.0, 0.0];   			// color list
+			polygon[1][ii] = [1.0, 1.0, 1.0, 0.0];   			// color list
+			points.push(polygon[0][ii]);
+			colors.push(polygon[1][ii]);
 		}
 		polygon[2] = normal_newell_method(polygon[0]);			// normal
 		polygon[3] = vec3(0.0,0.0,0.01);   						// displacement
@@ -903,6 +916,7 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 	}
 	return polygons;
 }
+
 
 function triangle_centroid(polygon,normal){
 	var originX = (polygon[0][0]+polygon[1][0]+polygon[2][0])/3;

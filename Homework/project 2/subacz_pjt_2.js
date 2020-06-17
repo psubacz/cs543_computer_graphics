@@ -66,14 +66,15 @@ var dx = 0;		//units x translation
 var dy = 0;		//units y translation
 var dz = 0;		//units z translation
 
-var pulseScale = 0.05;	//pulse scale
+var pulseScale = 0.5;	//pulse scale
 var pulseIndex = 0;	//pulse index for animation
 
-var animationDelay = 500;	//sleep delay in ms
+var animationDelay = 1000;	//sleep delay in ms
 
 var perspectiveScale = 0.09;
 var zNear = 0.1;
 var zFar = 100;
+
 //polygon center
 var centerX = 1;
 var centerY = 1;
@@ -99,8 +100,6 @@ var transNegY = false;
 var transNegZ = false;
 
 function main() {
-	// console.log(document.getElementById('b1'));
-
 	update_state_output(); // update the status box with current status
 	process_keypress(' '); // show the possible inputs
 	window.onkeypress = function (event) { //when a key is pressed, process the input
@@ -111,15 +110,18 @@ function main() {
 	document.getElementById('ply-file').addEventListener('change', function () {
 		var fileReader = new FileReader();
 		fileReader.onload = function (e) {
+			// reset model to base frame.
 			animation = false;
 			extents = [];
 			polygons = [];
+			points = [];
+			colors = [];
 			var vertexCoordsList = []; // list of vertex cordinates 
 			var polygonIndexList = []; // list of polygon indexs within the vertexCoordsList.
 			extents = [];
 			[vertexCoordsList, polygonIndexList, extents] = parse_ply_file(vertexCoordsList, polygonIndexList, fileReader.result);
-			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
 			init();
+			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
 			animationDelay *= 1/(polygons.length);
 			animation = true;
 			render();
@@ -216,16 +218,18 @@ function render(){
 	gl.enableVertexAttribArray(vColor);//Turns the attribute on
 
 	while(i<(points.length)){
-		translateMatrix = translate(dx+polygons[i/4][6][pulseIndex][0], dy+polygons[i/4][6][pulseIndex][1], dz+polygons[i/4][6][pulseIndex][2]);
-		// var ctMatrix = mult(translateMatrix,rotMatrix);
-		var ctMatrix = mult(rotMatrix,translateMatrix);
+
+		// setup matrix for pulse then multiply by translation 
+		var pulseTranslationMatrix = translate(polygons[i/4][6][pulseIndex][0],polygons[i/4][6][pulseIndex][1],polygons[i/4][6][pulseIndex][2])
+		var tTranslateMatrix = translate(dx, dy, dz);
+		translateMatrix = mult(rotMatrix ,pulseTranslationMatrix);
+		var ctMatrix = mult(tTranslateMatrix,translateMatrix); // rotate around the axis then translate it.
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
 
 		gl.drawArrays(gl.LINE_LOOP, i, 4);
 		i+=4;
 		update_state_output()
-		
 	}
 	for(var i = 0; i < polygons.length; ++i) {
 		if(drawNormal){
@@ -939,6 +943,7 @@ function polygon_pulse(polygon,normal){
 			where: c is the scaling factor, n is the normal, sin(alpha) is the direction. Alpha is scaled between 
 			0.0 -> pi/16. When alpha exceeds each limit the directional is changed to reverse the interpolation.
 	*/
+
 	var displacements = [vec3((0.0,0.0,0.0))];
 	var normalDisplacement = 0;
 	var alpha =0.01;
@@ -951,9 +956,9 @@ function polygon_pulse(polygon,normal){
 		}
 		alpha +=0.01*direction;
 		displacements.push(vec3(
-			pulseScale*normal[0]*normalDisplacement*100, 	//x
-			pulseScale*normal[1]*normalDisplacement*100, 	//y
-			pulseScale*normal[2]*normalDisplacement*100)); 	//z
+			centerX*pulseScale*normal[0]*normalDisplacement*100, 	//x
+			centerY*pulseScale*normal[1]*normalDisplacement*100, 	//y
+			centerZ*pulseScale*normal[2]*normalDisplacement*100)); 	//z
 	}
 	return displacements;
-}``
+}

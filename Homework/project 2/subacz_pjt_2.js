@@ -66,7 +66,7 @@ var dx = 0;		//units x translation
 var dy = 0;		//units y translation
 var dz = 0;		//units z translation
 
-var pulseScale = 0.5;	//pulse scale
+var pulseScale = 5;	//pulse scale
 var pulseIndex = 0;	//pulse index for animation
 
 var animationDelay = 1000;	//sleep delay in ms
@@ -84,7 +84,7 @@ var normalLineScale = 0.15;
 //control bools
 var animation = true;
 var initSleep = true;
-var drawNormal = false;
+var drawNormal = true;
 var pulse = false;
 var rotPosX = false;
 var rotNegX = false;
@@ -111,6 +111,8 @@ function main() {
 		var fileReader = new FileReader();
 		fileReader.onload = function (e) {
 			// reset model to base frame.
+			process_keypress('Q');
+			process_keypress('W');
 			animation = false;
 			extents = [];
 			polygons = [];
@@ -155,9 +157,7 @@ function init(){
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);	// Set clear color
 	if(initSleep){
 		sleep(10)
-	}
-
-				
+	}			
 }
 
 function set_colors(colorIndex){
@@ -217,10 +217,10 @@ function render(){
 	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vColor);//Turns the attribute on
 
+	var index = 6;
 	while(i<(points.length)){
-
 		// setup matrix for pulse then multiply by translation 
-		var pulseTranslationMatrix = translate(polygons[i/4][6][pulseIndex][0],polygons[i/4][6][pulseIndex][1],polygons[i/4][6][pulseIndex][2])
+		var pulseTranslationMatrix = translate(polygons[i/6][6][pulseIndex][0],polygons[i/index][6][pulseIndex][1],polygons[i/index][6][pulseIndex][2])
 		var tTranslateMatrix = translate(dx, dy, dz);
 		translateMatrix = mult(rotMatrix ,pulseTranslationMatrix);
 		var ctMatrix = mult(tTranslateMatrix,translateMatrix); // rotate around the axis then translate it.
@@ -228,33 +228,37 @@ function render(){
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
 
 		gl.drawArrays(gl.LINE_LOOP, i, 4);
-		i+=4;
-		update_state_output()
-	}
-	for(var i = 0; i < polygons.length; ++i) {
-		if(drawNormal){
-			var vBuffer = gl.createBuffer();		// Create vertex buffer
-			gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, flatten(polygons[i][5]), gl.STATIC_DRAW);
-			//Get the location of the shader's vPosition attribute in the GPU's memory
-			var vPosition = gl.getAttribLocation(program, "vPosition");
-			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-			gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
-		
-			var cBuffer = gl.createBuffer();		// Create color buffer
-			gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, flatten([vec4(0.0,1.0,0.0,1),vec4(0.0,1.0,0.0,1)]), gl.STATIC_DRAW);
-			//Get the location of the shader's vColor attribute in the GPU's memory
-			var vColor = gl.getAttribLocation(program, "vColor");
-			gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-			gl.enableVertexAttribArray(vColor);//Turns the attribute on
-			gl.drawArrays(gl.LINES, 0,2);
+		if(drawNormal){		
+			gl.drawArrays(gl.LINES, i+4,2);
 		}
-	
+		i+=6;
+		update_state_output()
 	}
 
 	if(true){
-		draw_center();
+		var tTranslateMatrix = translate(dx, dy, dz);
+		var ctMatrix = mult(tTranslateMatrix,rotMatrix); // rotate around the axis then translate it
+		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+		var cCenter = vec4(centerX,centerY,centerZ,1.0);
+		var cColor = vec4(1.0,0.0,0.0,1)
+		
+		var vBuffer = gl.createBuffer();		// Create vertex buffer
+		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
+		//Get the location of the shader's vPosition attribute in the GPU's memory
+		var vPosition = gl.getAttribLocation(program, "vPosition");
+		gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
+	
+		var cBuffer = gl.createBuffer();		// Create color buffer
+		gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW);
+		//Get the location of the shader's vColor attribute in the GPU's memory
+		var vColor = gl.getAttribLocation(program, "vColor");
+		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(vColor);//Turns the attribute on
+		
+		gl.drawArrays(gl.POINTS, 0,1);
 	}
 
 	if (animation){
@@ -263,33 +267,6 @@ function render(){
 	if (animationDelay>0.15){
 		sleep(animationDelay);
 	}
-}
-
-function draw_center(){
-	var cCenter = vec4(centerX,centerY,centerZ,1.0);
-	var cColor = vec4(1.0,0.0,0.0,1)
-	
-	translateMatrix = translate(0, 0, 0);
-	var vBuffer = gl.createBuffer();		// Create vertex buffer
-	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
-	//Get the location of the shader's vPosition attribute in the GPU's memory
-	var vPosition = gl.getAttribLocation(program, "vPosition");
-	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vPosition);			//Turns the attribute on
-
-	var cBuffer = gl.createBuffer();		// Create color buffer
-	gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW);
-	//Get the location of the shader's vColor attribute in the GPU's memory
-	var vColor = gl.getAttribLocation(program, "vColor");
-	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vColor);//Turns the attribute on
-	
-	var ctMatrix = mult(translateMatrix,rotMatrix);
-	var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-	gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-	gl.drawArrays(gl.POINTS, 0,1);
 }
 
 function sleep( sleepDuration ){
@@ -917,6 +894,8 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 		polygon[5] = triangle_centroid(polygon[0],polygon[2]);	// directionality constant	
 		polygon[6] = polygon_pulse(polygon[0],polygon[2]);		// list of normal displacment
 		polygons[i] = polygon;									//store polygon in the array
+		points.push(polygon[5][0],polygon[5][1]);
+		colors.push(vec4(0.0,1.0,0.0,1),vec4(0.0,1.0,0.0,1));
 	}
 	return polygons;
 }
@@ -943,7 +922,6 @@ function polygon_pulse(polygon,normal){
 			where: c is the scaling factor, n is the normal, sin(alpha) is the direction. Alpha is scaled between 
 			0.0 -> pi/16. When alpha exceeds each limit the directional is changed to reverse the interpolation.
 	*/
-
 	var displacements = [vec3((0.0,0.0,0.0))];
 	var normalDisplacement = 0;
 	var alpha =0.01;
@@ -956,9 +934,9 @@ function polygon_pulse(polygon,normal){
 		}
 		alpha +=0.01*direction;
 		displacements.push(vec3(
-			centerX*pulseScale*normal[0]*normalDisplacement*100, 	//x
-			centerY*pulseScale*normal[1]*normalDisplacement*100, 	//y
-			centerZ*pulseScale*normal[2]*normalDisplacement*100)); 	//z
+			pulseScale*normal[0]*normalDisplacement, 	//x
+			pulseScale*normal[1]*normalDisplacement, 	//y
+			pulseScale*normal[2]*normalDisplacement)); 	//z
 	}
 	return displacements;
 }

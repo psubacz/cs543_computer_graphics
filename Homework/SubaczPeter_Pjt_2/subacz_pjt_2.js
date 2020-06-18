@@ -35,72 +35,65 @@
  * 		Press ' B ' or ' b ' to toggle the breathing (pulsing).
  * 	Draw normal lines
  * 		Press ' D ' or ' d ' to toggle the normal lines.
- * 	Change colors
- * 		press ' E ' or ' e ' to rotate between colors.
+ * 	Randomize colors
+ * 		Press ' E ' or ' e ' to randomize the line colors
  * 	Reset rotations and Translations
  * 		Press ' Q ' or ' q ' to turn off active modes.
  * 		Press ' W ' or ' w ' to reset model to origin.
  */
 
 // global variables
-var gl;
-var program;
-var extents;
-var canvas;
-var id;
+var gl;					//webgl
+var program;			//program defined in html
+var rotMatrix;			//rotaton matrix
+var translateMatrix;	//translation matrix
+var canvas;				//
+var id;					// animation frame id
 //------------------
-var rotMatrix;	//rotaton matrix
-var translateMatrix;		//translation matrix
 
-var points = [];
-var colors = [];
-
-var polygons = [];	//list of polygons see function <construct_polygon_points> for me detail
-var key = '';	//key press string
-
-var theta = 0; 	//degrees x rotation
-var beta = 0;	//degrees y rotation
-var gamma = 0;	//degrees z rotation
-var disp = 0.01;//unit displacement
-var dx = 0;		//units x translation
-var dy = 0;		//units y translation
-var dz = 0;		//units z translation
-var avgX = 0;
-var avgY = 0;
-var avgZ = 0;
-
-var pulseScale = 5;	//pulse scale
-var pulseIndex = 0;	//pulse index for animation
-
-var animationDelay = 1000;	//sleep delay in ms
-
-var perspectiveScale = 0.9;
-var zNear = 0.1;
-var zFar = 100;
-
-//polygon center
-var centerX = 1;
-var centerY = 1;
-var centerZ = 1;
-var normalLineScale = 0.15;
-
+var points = [];		//points used int the vertex shader
+var colors = [];		//colors for each vertex
+var polygons = [];		//list of polygons
+var key = '';			//key press string
+var theta = 0; 			//degrees roll
+var beta = 0;			//degrees pitch
+var gamma = 0;			//degrees yaw
+var disp = 0.01;		//unit displacement
+var dx = 0;				//units x translation
+var dy = 0;				//units y translation
+var dz = 0;				//units z translation
+//Pulse
+var pulseScale = 2.5;	//pulse scale
+var pulseIndex = 0;		//pulse index for animation
+var animationDelay = 2000;//sleep delay in ms
+//setup perspective items
+var perspectiveScale = 0.9;//perspective scaling factor
+var zNear = 0.1;		// init zNear for perspective projection
+var zFar = 100;			// init zFar for perspective projection
+var extents;			// extents used to calculate model stuff
+var avgX = 0;			//Average X to center a model
+var avgY = 0;			//Average Y to center a model
+var avgZ = 0;			//Average Z to center a model
+var centerX = 1;		//polygon center x coord
+var centerY = 1;		//polygon center y coord
+var centerZ = 1;		//polygon center z coord
+var normalLineScale = 0.10;
 //control bools
-var animation = true;
-var initSleep = true;
-var drawNormal = true;
-var pulse = false;
-var rotPosX = false;
-var rotNegX = false;
-var rotPosY = false;
-var rotNegY = false;
-var rotPosZ = false;
-var rotNegZ = false;
-var transPosX = false;
-var transPosY = false;
-var transPosZ = false;
-var transNegX = false;
-var transNegY = false;
-var transNegZ = false;
+var animation = true;	//toggle animation (used when uploading new file)
+var drawNormal = true;	//toggle draw normals on centroid of triangles
+var pulse = false;		//toggle breathing animation
+var rotPosX = false;	//toggle + roll
+var rotNegX = false;	//toggle - roll
+var rotPosY = false;	//toggle + Pitch
+var rotNegY = false;	//toggle - Pitch
+var rotPosZ = false;	//toggle + yaw
+var rotNegZ = false;	//toggle - yaw
+var transPosX = false;	//toggle + translation in x
+var transPosY = false;	//toggle - translation in x
+var transPosZ = false;	//toggle + translation in y
+var transNegX = false;	//toggle - translation in y
+var transNegY = false;	//toggle + translation in z
+var transNegZ = false;	//toggle - translation in z
 
 function main() {
 	update_state_output(); // update the status box with current status
@@ -116,20 +109,20 @@ function main() {
 			// reset model to base frame.
 			process_keypress('Q');
 			process_keypress('W');
-			animation = false;
-			extents = [];
-			polygons = [];
-			points = [];
-			colors = [];
+			animation = false;	//turn off animation while getting a new file
+			extents = [];		//clear extents
+			polygons = [];		//clear polygons
+			points = [];		//clear points
+			colors = [];		//clear colors
 			var vertexCoordsList = []; // list of vertex cordinates 
 			var polygonIndexList = []; // list of polygon indexs within the vertexCoordsList.
-			extents = [];
+			//parse the file
 			[vertexCoordsList, polygonIndexList, extents] = parse_ply_file(vertexCoordsList, polygonIndexList, fileReader.result);
-			init();
-			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList);
-			animationDelay *= 1/(polygons.length);
-			animation = true;
-			render();
+			init();				//init webgl
+			polygons = construct_polygon_points(vertexCoordsList, polygonIndexList); //get polygons
+			animationDelay *= 1/(polygons.length);	//set animation delay by the number of polygons in list
+			animation = true;	//turn animation back on
+			render();			//render the file
 		}
 		fileReader.readAsText(this.files[0]);
 	})
@@ -157,53 +150,22 @@ function init(){
 	gl.enable(gl.DEPTH_TEST);	//enable depth testing
 	set_perspective_view();		//set the camera
 	set_point_size();			//set the point size
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);	// Set clear color
-	if(initSleep){
-		sleep(10)
-	}			
-}
-
-function set_colors(colorIndex){
-	/*** COLOR DATA ***/
-	var colors = [];
-	for(ii=1;ii<4;ii++){
-		switch (colorIndex){
-			case 0:
-				colors.push(vec4(0.0, 0.0, 0.0, 1.0)); //black
-				break;
-			case 1:
-				colors.push(vec4(1.0, 0.0, 0.0, 1.0)); //red
-				break;
-			case 2:
-				colors.push(vec4(0.0, 1.0, 0.0, 1.0)); //green
-				break;
-   			case 3:
-				colors.push(vec4(0.0, 0.0, 1.0, 1.0)); //blue
-				break;
-		default:
-			colors.push(vec4(0.0, 0.0, 0.0, 1.0)); //black
-		}
-		return colors;
-	}
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);	// Set clear color		
 }
 
 function render(){   
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	// We tell WebGL which shader program to execute.
-	set_rotation();			// set rotation if active
-	set_translation(); 		// set translation if active
-	
-	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));// calculate the new rotation per render
 
-	if (pulse){
+
+	if (pulse){	//if pulse is turned on, look up the pulse distance
 		if (pulseIndex<polygons[0][6].length-1){
 			pulseIndex+=1;
 		}else{
 			pulseIndex = 0;
 		}
 	}
-	var i = 0
-
+	
+	// pass in the polygon points
 	var vBuffer = gl.createBuffer();		// Create vertex buffer
 	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STREAM_DRAW);
@@ -220,36 +182,42 @@ function render(){
 	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vColor);//Turns the attribute on
 
-	var modelTranslate = translate(-avgX, -avgY, -avgZ)
-
-	var index = 6;
+	// We tell WebGL which shader program to execute.
+	set_rotation();			// set rotation if active
+	set_translation(); 		// set translation if active
+	
+	rotMatrix = mult(rotateZ(gamma),mult(rotateY(beta),rotateX(theta)));// calculate the new rotation per render
+	var modelToCenterTranslation = translate(-avgX, -avgY, -avgZ);		//translate model to (0,0,0)
+	var modelTranslation = translate(dx, dy, dz);						//translate model from center
+	var modelScale = scalem(0.8,0.8,0.8);								// scale the model by 0.8
+	var index = 6; 			// In the points list, every 6 positions are a new polygon
+	var i = 0;
 	while(i<(points.length)){
-		// setup matrix for pulse then multiply by translation 
-		var pulseTranslationMatrix = mult(modelTranslate,translate(polygons[i/6][6][pulseIndex][0],polygons[i/index][6][pulseIndex][1],polygons[i/index][6][pulseIndex][2]))
-		var modelScale = scalem(0.8,0.8,0.8);
-		
-		var tTranslateMatrix = translate(dx, dy, dz);
-		translateMatrix = mult(rotMatrix ,pulseTranslationMatrix);
-		var ctMatrix = mult(modelScale,mult(tTranslateMatrix,translateMatrix)); // rotate around the axis then translate it.
+		// 0. Get pulse translations
+		var pulseTranslationMatrix = translate(polygons[i/6][6][pulseIndex][0],polygons[i/index][6][pulseIndex][1],polygons[i/index][6][pulseIndex][2]);
+		// 1. Translate the polygon to the center for the screen,
+		// 2.then rotate it around the center axis, 
+		translateMatrix = mult(rotMatrix ,mult(modelToCenterTranslation,pulseTranslationMatrix));
+		// 3. translate model from center to set point and scale the model
+		var ctMatrix = mult(modelScale,mult(modelTranslation,translateMatrix)); // rotate around the axis then translate it.
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
-		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
 
-		gl.drawArrays(gl.LINE_LOOP, i, 4);
+		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));		// pass to vertex shader.
+		gl.drawArrays(gl.LINE_LOOP, i, 4);		//draw line loops
 		if(drawNormal){		
-			gl.drawArrays(gl.LINES, i+4,2);
+			gl.drawArrays(gl.LINES, i+4,2);		//draw normal lines
 		}
-		i+=6;
+		i+=6;	//increment the index
 		update_state_output()
 	}
 
-	if(true){
-		var tTranslateMatrix = translate(dx, dy, dz);
-		var ctMatrix = mult(tTranslateMatrix,rotMatrix); // rotate around the axis then translate it
-		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-		// var cCenter = vec4(centerX,centerY,centerZ,1.0);
+	if(true){ //draw a red dot at the center of each model 
 		var cCenter = vec4(0,0,0,1.0);
-		var cColor = vec4(1.0,0.0,0.0,1)
-		
+		var cColor = vec4(1.0,0.0,0.0,1)	
+		var modelTranslation = translate(dx, dy, dz);
+		var ctMatrix = mult(modelTranslation,rotMatrix); // rotate around the axis then translate it
+		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
+
 		var vBuffer = gl.createBuffer();		// Create vertex buffer
 		gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
@@ -265,39 +233,41 @@ function render(){
 		var vColor = gl.getAttribLocation(program, "vColor");
 		gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 		gl.enableVertexAttribArray(vColor);//Turns the attribute on
-		
 		gl.drawArrays(gl.POINTS, 0,1);
 	}
 
-	if (animation){
+	if (animation){ //recursive animation 
 		id = requestAnimationFrame(render);
 	}
-	if (animationDelay>0.1){
-		sleep(animationDelay);
+	if(animationDelay>50){
+		sleep(50);
+	}else {
+		sleep(10);
 	}
 }
 
 function sleep( sleepDuration ){
-	// apperently JS does not have a sleep utility
+	// apperently JS does not have a sleep utility, becuase its 'not useful' here is one off the internet
+	// source: https://stackoverflow.com/questions/951021/what-is-the-javascript-version-of-sleep
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){ /* do nothing */ } 
 }
 
 function set_perspective_view(){
 	/*
+		sets the projection matrix
 	
 	*/
-	// use the extents to make a bounding sphere
+	// use the extents to grap the average center point
 	if (extents.length){
 		centerX = (extents[3]+extents[0])/2.0;
 		centerY = (extents[4]+extents[1])/2.0;
 		centerZ = (extents[5]+extents[2])/2.0;
-		//calculate the  
 		var r = 1.1*Math.sqrt(Math.pow(extents[3] - centerX, 2)+ Math.pow(extents[4] - centerY, 2) + Math.pow(extents[5] - centerZ, 2));
 	}else{
 		r=1;
 	}
-
+	// set FOV and aspect ratio
 	var fieldOfView = 60;
 	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 	var zDisplacement = r / Math.tan(fieldOfView); 
@@ -359,6 +329,15 @@ function set_rotation(){
 	}
 }
 
+function set_colors(){
+	animation = false;
+	colors = [];
+	for(i = 0; i<points.length;i++){
+		colors.push(vec4(Math.random(),Math.random(),Math.random(),1));
+	}
+	animation = true;
+}
+
 function set_translation(){
 	if( transPosX== true){
 		dx += disp;
@@ -384,13 +363,23 @@ function set_translation(){
 }
 
 function update_state_output(){
+	// update the output box with relevent information
 	msg = "";
+	if (animation == true){
+		msg += " Animation: On<br>";
+	}else{
+		msg += " Animation: Off<br>";
+	}
 	if (pulse == true){
 		msg += " Breathing: On<br>";
 	}else{
 		msg += " Breathing: Off<br>";
 	}
-
+	if (drawNormal == true){
+		msg += " Normals: On<br>";
+	}else{
+		msg += " Normals: Off<br>";
+	}
 	msg += "--------Translation-----------<br>";
 	if (transPosX){
 		msg += " X: "+dx.toFixed(3)+" Status: +<br>";
@@ -413,13 +402,6 @@ function update_state_output(){
 	}else{
 		msg += " Z: "+dz.toFixed(3)+" Status: <br>";
 	}
-	var rotPosX = false;
-	var rotNegX = false;
-	var rotPosY = false;
-	var rotNegY = false;
-	var rotPosZ = false;
-	var rotNegZ = false;
-
 	msg += "--------Rotation---------------<br>";
 	//rotations
 	if (rotPosX){
@@ -443,7 +425,6 @@ function update_state_output(){
 	}else{
 		msg += " Yaw: " + gamma.toFixed(0) + " Status: <br>";
 	}
-	
 	document.getElementById("meshState").innerHTML = msg;
 }
 
@@ -453,6 +434,10 @@ function process_keypress(theKey){
 
 	//on key presses, do change the colors or modes
 	switch (theKey) {
+		case 'E':
+		case 'e':
+			set_colors();
+			break;
 		case 'D':
 		case 'd':
 			// Translate your wireframe in the + x direction.
@@ -819,9 +804,9 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 			}
 		}
 	}
-	avgX/=vertexCoordsList.length;
-	avgY/=vertexCoordsList.length;
-	avgZ/=vertexCoordsList.length;
+	avgX/=vertexCoordsList.length;	//
+	avgY/=vertexCoordsList.length;	//
+	avgZ/=vertexCoordsList.length;	//
 	// display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
@@ -915,6 +900,8 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 }
 
 function triangle_centroid(polygon,normal){
+	//calculate teh centroid of a polygon. 
+
 	var originX = (polygon[0][0]+polygon[1][0]+polygon[2][0])/3;
 	var originY = (polygon[0][1]+polygon[1][1]+polygon[2][1])/3;
 	var originZ = (polygon[0][2]+polygon[1][2]+polygon[2][2])/3;

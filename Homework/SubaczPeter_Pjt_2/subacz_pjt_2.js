@@ -65,13 +65,16 @@ var disp = 0.01;//unit displacement
 var dx = 0;		//units x translation
 var dy = 0;		//units y translation
 var dz = 0;		//units z translation
+var avgX = 0;
+var avgY = 0;
+var avgZ = 0;
 
 var pulseScale = 5;	//pulse scale
 var pulseIndex = 0;	//pulse index for animation
 
 var animationDelay = 1000;	//sleep delay in ms
 
-var perspectiveScale = 0.09;
+var perspectiveScale = 0.9;
 var zNear = 0.1;
 var zFar = 100;
 
@@ -217,13 +220,17 @@ function render(){
 	gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vColor);//Turns the attribute on
 
+	var modelTranslate = translate(-avgX, -avgY, -avgZ)
+
 	var index = 6;
 	while(i<(points.length)){
 		// setup matrix for pulse then multiply by translation 
-		var pulseTranslationMatrix = translate(polygons[i/6][6][pulseIndex][0],polygons[i/index][6][pulseIndex][1],polygons[i/index][6][pulseIndex][2])
+		var pulseTranslationMatrix = mult(modelTranslate,translate(polygons[i/6][6][pulseIndex][0],polygons[i/index][6][pulseIndex][1],polygons[i/index][6][pulseIndex][2]))
+		var modelScale = scalem(0.8,0.8,0.8);
+		
 		var tTranslateMatrix = translate(dx, dy, dz);
 		translateMatrix = mult(rotMatrix ,pulseTranslationMatrix);
-		var ctMatrix = mult(tTranslateMatrix,translateMatrix); // rotate around the axis then translate it.
+		var ctMatrix = mult(modelScale,mult(tTranslateMatrix,translateMatrix)); // rotate around the axis then translate it.
 		var ctMatrixLoc = gl.getUniformLocation(program, "modelMatrix");
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
 
@@ -239,7 +246,8 @@ function render(){
 		var tTranslateMatrix = translate(dx, dy, dz);
 		var ctMatrix = mult(tTranslateMatrix,rotMatrix); // rotate around the axis then translate it
 		gl.uniformMatrix4fv(ctMatrixLoc, false, flatten(ctMatrix));
-		var cCenter = vec4(centerX,centerY,centerZ,1.0);
+		// var cCenter = vec4(centerX,centerY,centerZ,1.0);
+		var cCenter = vec4(0,0,0,1.0);
 		var cColor = vec4(1.0,0.0,0.0,1)
 		
 		var vBuffer = gl.createBuffer();		// Create vertex buffer
@@ -264,7 +272,7 @@ function render(){
 	if (animation){
 		id = requestAnimationFrame(render);
 	}
-	if (animationDelay>0.15){
+	if (animationDelay>0.1){
 		sleep(animationDelay);
 	}
 }
@@ -297,13 +305,13 @@ function set_perspective_view(){
 	zNear = zDisplacement - r;
 	zFar = zDisplacement + r;
 	
-	var thisProj = perspective(fieldOfView, aspect, (zNear*perspectiveScale), zFar*(1+perspectiveScale));
+	var thisProj = perspective(fieldOfView, aspect, (zNear), zFar*(1+perspectiveScale));
 
 	var projMatrix = gl.getUniformLocation(program, 'projMatrix');
 	gl.uniformMatrix4fv(projMatrix, false, flatten(thisProj));
 
 	var eye = vec3(0.0, 0.0, zNear*1.4); 	// position at camera at XYZ
-	var at  = vec3(centerX, centerY, centerZ);		// center point of what is being looked at XYZ
+	var at  = vec3(centerX,centerY, centerZ);		// center point of what is being looked at XYZ
 	// var at  = vec3(0, 0, 0);		// center point of what is being looked at XYZ
 	var up  = vec3(0.0, 1.0, 0.0); // any dirction use 
 	var viewMatrix = lookAt(eye, at, up);
@@ -788,15 +796,18 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 						x_min = point[0];
 					}
 					if (point[1] > y_max) {
-						y_max = point[0];
+						y_max = point[1];
 					} else if (point[1] < y_min) {
-						y_min = point[0];
+						y_min = point[1];
 					}
-					if (point[0] > z_max) {
-						z_max = point[0];
-					} else if (point[0] < z_min) {
-						z_min = point[0];
+					if (point[2] > z_max) {
+						z_max = point[2];
+					} else if (point[2] < z_min) {
+						z_min = point[2];
 					}
+					avgX += point[0];
+					avgY += point[1];
+					avgZ += point[2];
 
 				} else if (index == 4) {
 					polygonIndexList[polygonIndex] = point;
@@ -808,6 +819,9 @@ function parse_ply_file(vertexCoordsList, polygonIndexList, rawText) {
 			}
 		}
 	}
+	avgX/=vertexCoordsList.length;
+	avgY/=vertexCoordsList.length;
+	avgZ/=vertexCoordsList.length;
 	// display_file_metadata(plyDataType, endHeader, numberVertices, numberPolygons, vertexIndex, polygonIndex);
 	return [vertexCoordsList, polygonIndexList, [x_min, y_min, z_min, x_max, y_max, z_max]];
 }
@@ -899,7 +913,6 @@ function construct_polygon_points(vertexCoordsList, polygonIndexList)
 	}
 	return polygons;
 }
-
 
 function triangle_centroid(polygon,normal){
 	var originX = (polygon[0][0]+polygon[1][0]+polygon[2][0])/3;

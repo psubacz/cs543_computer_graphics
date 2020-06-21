@@ -34,25 +34,11 @@ The project has the following modes:
  * 		Press ' W ' or ' w ' to reset model to origin.
 
 At runtime, the program:
-1. ingest a file
-2.
-
-To open the project, open the html in a firefox or chrome web browser, select the file broswe button,
-    and select a then click ok. The mesh will be rendered to the screen 
-
-During ingest the parser will attempt to find the ply header tag, number 
-    of vertices, number of polygons, and end_header tag, If any of these 
-    are missing from the header, a warning or error message will be displayed.
-    Error messages will occur if ply or end_header tags are missing from header.
-    These are required for the parser to operate and the files will need 
-    manual fixing before processing. Warning messages will occur if processed 
-    vertices and polygons do not match what is listed in the header. The program 
-    will continue with the warning displayed. The parse will only be trigger on 
-    a successful upload of a ply file.
-
-During the perspective setting, a unit sphere will be with a radius defined by the
-    extents of a model will be calucalated. the radius will be used to calculate the
-
-
-
-    
+0.  Reset translations and reset rotations
+1.  Ingest a file
+2.  Build polygons 
+2.1 Calculate normals
+2.2 Calculate centroids
+2.3 Calculate pulses
+3.  Calculate animation delay
+4.  Recusively render

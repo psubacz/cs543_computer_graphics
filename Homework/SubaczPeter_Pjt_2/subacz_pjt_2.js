@@ -156,7 +156,6 @@ function init(){
 function render(){   
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-
 	if (pulse){	//if pulse is turned on, look up the pulse distance
 		if (pulseIndex<polygons[0][6].length-1){
 			pulseIndex+=1;
@@ -242,7 +241,7 @@ function render(){
 	if(animationDelay>50){
 		sleep(50);
 	}else {
-		sleep(10);
+		sleep(100);
 	}
 }
 
@@ -329,11 +328,18 @@ function set_rotation(){
 	}
 }
 
-function set_colors(){
+function set_colors(random){
+	// set recolor to random colors.
 	animation = false;
 	colors = [];
-	for(i = 0; i<points.length;i++){
-		colors.push(vec4(Math.random(),Math.random(),Math.random(),1));
+	if(random){
+		for(i = 0; i<points.length;i++){
+			colors.push(vec4(Math.random(),Math.random(),Math.random(),1));
+		}
+	}else{
+		for(i = 0; i<points.length;i++){
+			colors.push(vec4(1,1,1,1));
+		}
 	}
 	animation = true;
 }
@@ -436,7 +442,7 @@ function process_keypress(theKey){
 	switch (theKey) {
 		case 'E':
 		case 'e':
-			set_colors();
+			set_colors(true);
 			break;
 		case 'D':
 		case 'd':
@@ -607,6 +613,7 @@ function process_keypress(theKey){
 			//pulse settings
 			t = 0
 			pulse = false;
+			set_colors(false);
 			break;		
 		case 'W':
 		case 'w':

@@ -96,7 +96,9 @@ function cube(){
     verts = verts.concat(quad( 5, 4, 0, 1 ));
     return verts;
 }
-
+var treeDisplacementX = 2.5;
+var treeDisplacementY = 2.5;
+var treeDisplacementZ = 0;
 function computeHierarchyModel(){
 	/*
 		Computes a model hierarchy for 3 distinct levels 
@@ -118,72 +120,56 @@ function computeHierarchyModel(){
 	*/
 	
 	modelRotations();			//increment rotation angle
-	//Level 0 objects
-	
-	stack.push(mvMatrix); 	
 	mvMatrix = mult(mvMatrix,rotateY(-theta));//rotations 
 	gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
 	draw_object(theCube, vec4(1.0, 0.0, 0.0, 1.0));
-	draw_lines()
-	attach_subtree()
-	draw_lines()
-	attach_subtree()
-	draw_lines()
-	attach_subtree()
-	mvMatrix = stack.pop();
-	mvMatrix = stack.pop();
-	mvMatrix = stack.pop();
-
-			//level 2 objects
-			// stack.push(mvMatrix);
-			// mvMatrix = mult(mvMatrix,translate(1.5, -2.5, 0));
-			// mvMatrix = mult(mvMatrix, rotateY(-2*theta));
-			// gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
-			// draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
-			// // draw_lines()
-
-			// // //level 3 obects
-			// // stack.push(mvMatrix);
-			// // 	mvMatrix = mult(mvMatrix,translate(1.5, -2.5, 0));
-			// // 	mvMatrix = mult(mvMatrix, rotateY(2*theta));
-			// // 	gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
-			// // 	draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
-			// // 	mvMatrix = mult(mvMatrix, rotateY(-2*theta));
-			// // 	mvMatrix = mult(mvMatrix,translate(-1.5, 2.5, 0));
-			// // 	mvMatrix = mult(mvMatrix,translate(-1.5, -2.5, 0));
-			// // 	mvMatrix = mult(mvMatrix, rotateY(2*theta));
-			// // 	gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
-			// // 	draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
-			// // mvMatrix = stack.pop();
-
-			// mvMatrix = mult(mvMatrix, rotateY(2*theta));
-			// mvMatrix = mult(mvMatrix,translate(-1.5, 2.5, 0));
-			// mvMatrix = mult(mvMatrix,translate(-1.5, -2.5, 0));
-			// mvMatrix = mult(mvMatrix, rotateY(-2*theta));
-			// gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
-			// draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
-
-		// 	mvMatrix = stack.pop();
-		// mvMatrix = stack.pop();
-	mvMatrix = stack.pop();
+	treeDisplacementX = 2.5;
+	attach_subtrees(3);
 }
 
-function attach_subtree(){
-	//Level 1 objects
-	stack.push(mvMatrix);
-	mvMatrix = mult(mvMatrix,translate(1.5, -2.5, 0));
-	mvMatrix = mult(mvMatrix, rotateY(2*theta));
-	gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
-	draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
 
-	mvMatrix = mult(mvMatrix, rotateY(-2*theta));
-	mvMatrix = mult(mvMatrix,translate(-1.5, 2.5, 0));
-	mvMatrix = mult(mvMatrix,translate(-1.5, -2.5, 0));
-	mvMatrix = mult(mvMatrix, rotateY(2*theta));
-	gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
-	draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
+function attach_subtrees(numberTrees){
+	/* 
+		Recusively attach lower leveled objects.
+	*/
+	if(numberTrees>0){
+		treeDisplacementX-=0.5;
+		draw_lines();
+		stack.push(mvMatrix); 
+		if (stack.length%2>0){
+			//draw the right object 
+			mvMatrix = mult(mvMatrix,translate(treeDisplacementX, -treeDisplacementY, 0));
+			mvMatrix = mult(mvMatrix, rotateY(2*theta));
+			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
+			draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
 
+			//draw the left object 
+			mvMatrix = mult(mvMatrix, rotateY(-2*theta));
+			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, treeDisplacementY, 0));
+			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, -treeDisplacementY, 0));
+			mvMatrix = mult(mvMatrix, rotateY(2*theta));
+			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
+			draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
+			
+		}else{
+			//draw the right object
+			mvMatrix = mult(mvMatrix,translate(treeDisplacementX, -treeDisplacementY, 0));
+			mvMatrix = mult(mvMatrix, rotateY(-2*theta));
+			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
+			draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
 
+			// draw the left object 
+			mvMatrix = mult(mvMatrix, rotateY(2*theta));
+			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, treeDisplacementY, 0));
+			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, -treeDisplacementY, 0));
+			mvMatrix = mult(mvMatrix, rotateY(-2*theta));
+			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
+			draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
+		}
+		attach_subtrees(numberTrees-1);		//did somebody say recursion?
+	}
+	treeDisplacementX+=0.05;
+	mvMatrix = stack.pop();
 }
 
 function render()
@@ -244,10 +230,10 @@ function draw_object(cube, color){
 
 function draw_lines(strLevel){
 
-		var cCenter = [vec4( 0, -0.5, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle
-						vec4( -2, -1.5, 0, 1),vec4( 2, -1.5, 0, 1),	//left 
-						vec4( -1.5, -1.5, 0, 1),vec4( -1.5, -2, 0, 1),	//right
-						vec4( 2, -1.5, 0, 1),vec4( 2, -2, 0, 1)];	
+		var cCenter = [vec4( 0, -0.5, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
+						vec4( -treeDisplacementX-0.5, -1.5, 0, 1),vec4( treeDisplacementX+0.5, -1.5, 0, 1),		//horzontal line
+						vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2, 0, 1),	//right verticle line
+						vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2, 0, 1)];	//left verticle line
 		var cColor = [];
 		for(var i = 0; i < cCenter.length; i++)
 		{

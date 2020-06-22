@@ -36,6 +36,7 @@ var theCube = cube();
 currentTime = 0;
 
 //tree size
+var numberOfBranches = 3;		//number of subtrees within 
 var treeDisplacementX = 2.5;
 var treeDisplacementY = 2.5;
 var treeDisplacementZ = 0;
@@ -113,7 +114,7 @@ function computeHierarchyModel(){
 					|				
 				o-------o			level 1 objects
 				|		|
-			  o---o	  o---o		level 2 objects
+			  o---o	  o---o			level 2 objects
 
 
 		0. Reset: All objects start out as centered, the 0th object is translated 
@@ -129,17 +130,17 @@ function computeHierarchyModel(){
 	mvMatrix = mult(mvMatrix,rotateY(-beta));//rotations 
 	gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
 	draw_object(theCube, vec4(1.0, 0.0, 0.0, 1.0));
+
 	treeDisplacementX = 10;
-	attach_subtrees(4);
+	attach_subtrees(numberOfBranches);
 }
 
 function attach_subtrees(numberTrees){
 	/* 
-		Recusively attach lower leveled objects. there is an issue with the else 
-		  statement and recusion.
+		Recusively attach lower leveled objects.
 	*/
 	
-	numberTrees-=1
+	// numberTrees-=1;
 	// 
 	stack.push(mvMatrix); 
 	treeDisplacementX /=2;
@@ -150,8 +151,8 @@ function attach_subtrees(numberTrees){
 			mvMatrix = mult(mvMatrix, translate(treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(2*beta));
 			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
-			draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
-			attach_subtrees(numberTrees);	//did somebody say recursion?
+			draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
+			attach_subtrees(numberTrees-1);	//did somebody say recursion?
 			//draw the left object 
 			mvMatrix = mult(mvMatrix, rotateY(-2*beta));
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, treeDisplacementY, 0));
@@ -159,22 +160,23 @@ function attach_subtrees(numberTrees){
 			mvMatrix = mult(mvMatrix, rotateY(2*beta));
 			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
 			draw_object(theCube, vec4(0.0, 0.0, 1.0, 1.0));
-			attach_subtrees(numberTrees);		//did somebody say recursion?
+			attach_subtrees(numberTrees-1);		//did somebody say recursion?
+
 		}else{
 			//draw the right object
 			mvMatrix = mult(mvMatrix, translate(treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(-2*beta));
 			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
-			draw_object(theCube, vec4(1.0, 0.0, 1.0, 1.0));
-			attach_subtrees(numberTrees);		//did somebody say recursion?
+			draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
+			attach_subtrees(numberTrees-1);		//did somebody say recursion?
 			// draw the left object 
 			mvMatrix = mult(mvMatrix, rotateY(2*beta));
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(-2*beta));
 			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
-			draw_object(theCube, vec4(0.0, 1.0, 1.0, 1.0));
-			attach_subtrees(numberTrees);		//did somebody say recursion?
+			draw_object(theCube, vec4(0.0, 1.0, 0.0, 1.0));
+			attach_subtrees(numberTrees-1);		//did somebody say recursion?
 		}
 	}
 	treeDisplacementX*=2;

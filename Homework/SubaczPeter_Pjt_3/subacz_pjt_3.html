@@ -6,15 +6,47 @@
  
 	<script id="vshader" type="x-shader/x-vertex">
 	attribute vec4 vPosition;
+	attribute vec4 vNormal;
 	uniform mat4 projectionMatrix;
 	uniform mat4 modelMatrix;
 	attribute vec4 vColor;
+	uniform mat4 modelViewMatrix;
+	uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+	uniform float shininess;
+	uniform vec4 lightPosition;
 	varying vec4 fColor;
 	uniform float vPointSize;
+
 	void main() {
+		// Convert model to eye coordinates
+		vec3 pos = (modelMatrix * vPosition).xyz;
+
+		//vector from vertex position to light source
+		vec3 L = normalize(lightPosition.xyz - pos);
+
+		//view vector
+		vec3 V = normalize(-pos);
+
+		//Surface normal at that vertex
+		vec3 N = normalize(modelMatrix * vNormal).xyz;
+
+		//Reflection vector
+		vec3 R = (2.0 * dot(L, N) * N) - L;
+
+		//Ambient light
+		vec4 ambient = ambientProduct;
+
+		//Diffuse light
+		vec4 diffuse = dot(L, N) * diffuseProduct;
+
+		//Specular light
+		vec4 specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+
 		gl_Position = projectionMatrix * modelMatrix * vPosition;	// Point position
-  		gl_PointSize = vPointSize;		// Point size
-  		fColor = vColor;
+		gl_PointSize = vPointSize;		// Point size
+		fColor = ambient + diffuse + specular;
+		fColor.a = 1.0;
+  		//fColor = vColor;
   	}
 	</script>
 	

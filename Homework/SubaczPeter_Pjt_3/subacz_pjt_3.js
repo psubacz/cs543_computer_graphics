@@ -80,15 +80,30 @@ var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
 var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 
-
-var materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
-var materialDiffuse = vec4( 1.0, 0.8, 0.0, 1.0 );
+// sphere materials
+var materialAmbient = vec4( 0.0, 0.0, 0.0, 1.0 );
+var materialDiffuse = vec4( 0.0, 0.0, 0.0, 1.0 );
 var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
-var materialShininess = 20.0;
+var materialShininess = 0.0;
+
+// cube materials
+var materialAmbient = vec4( 0.0, 0.0, 0.0, 1.0 );
+var materialDiffuse = vec4( 0.0, 0.0, 0.0, 1.0 );
+var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+var materialShininess = 50.0;
+
+//Line materials
+var materialAmbient = vec4( 0.0, 0.0, 0.0, 1.0 );
+var materialDiffuse = vec4( 0.0, 0.0, 0.0, 1.0 );
+var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+var materialShininess = 0.0;
 
 var diffuseProduct;
 var specularProduct;
 var diffuseProduct;
+
+// spot light
+var phi = 0
 
 
 //yaw rotation variables
@@ -176,7 +191,6 @@ function render()
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
     gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
 
-	
 	computeHierarchyModel();
 
 	if (animation){ //recursive animation 
@@ -258,12 +272,19 @@ function attach_subtrees(numberOfBranches){
 }
 
 function draw_cube(color){
-    var fragColors = [];
+	var materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
+	var materialDiffuse = vec4( 1.0, 0.0, 1.0, 1.0 );
+	var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+	var materialShininess = 20.0;
 
-    for(var i = 0; i < theCube.length; i++)
-    {
-        fragColors.push(color);
-    }
+	diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    specularProduct = mult(lightSpecular, materialSpecular);
+	ambientProduct = mult(lightAmbient, materialAmbient);
+	gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
 
     var pBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
@@ -289,12 +310,19 @@ function draw_cube(color){
 
 function drawSphere(color)
 {
-	var fragColors = [];
+	var materialAmbient = vec4( 0.0, 1.0, 1.0, 1.0 );
+	var materialDiffuse = vec4( 0.0, 1.0, 1.0, 1.0 );
+	var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+	var materialShininess = 20.0;
 
-    for(var i = 0; i < pointsArray.length; i++)
-    {
-        fragColors.push(color);
-	}
+	diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    specularProduct = mult(lightSpecular, materialSpecular);
+	ambientProduct = mult(lightAmbient, materialAmbient);
+	gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+	gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
 	
     var nBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
@@ -318,6 +346,20 @@ function drawSphere(color)
 }
 
 function draw_lines(){
+	var materialAmbient = vec4( 0.0, 0.0, 0.0, 1.0 );
+	var materialDiffuse = vec4( 0.0, 0.0, 0.0, 1.0 );
+	var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+	var materialShininess = 20.0;
+
+	diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    specularProduct = mult(lightSpecular, materialSpecular);
+	ambientProduct = mult(lightAmbient, materialAmbient);
+	gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
+	
 	var cCenter = [vec4( 0, -0.5, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
 					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2, 0, 1),	//right verticle line

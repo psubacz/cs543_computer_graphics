@@ -5,24 +5,23 @@
     <title>Subacz Project 3</title>
  
 	<script id="vshader" type="x-shader/x-vertex">
-	attribute vec4 vPosition;
-	attribute vec4 vNormal;
+	attribute vec4 vPosition, vNormal, vColor;
 	uniform mat4 projectionMatrix;
 	uniform mat4 modelMatrix;
-	attribute vec4 vColor;
 	uniform mat4 modelViewMatrix;
 	uniform vec4 ambientProduct, diffuseProduct, specularProduct;
 	uniform float shininess;
-	uniform vec4 lightPosition;
+	uniform vec4 pointLightPosition;
 	varying vec4 fColor;
 	uniform float vPointSize;
+	uniform float phi;
 
 	void main() {
 		// Convert model to eye coordinates
 		vec3 pos = (modelMatrix * vPosition).xyz;
 
 		//vector from vertex position to light source
-		vec3 L = normalize(lightPosition.xyz - pos);
+		vec3 L = normalize(pointLightPosition.xyz - pos);
 
 		//view vector
 		vec3 V = normalize(-pos);
@@ -37,10 +36,19 @@
 		vec4 ambient = ambientProduct;
 
 		//Diffuse light
-		vec4 diffuse = dot(L, N) * diffuseProduct;
+		vec4 diffuse = vec4(0,0,0,0);//dot(L, N) * diffuseProduct;
 
 		//Specular light
-		vec4 specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+		vec4 specular = vec4(0,0,0,0);//pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+
+		//light direction
+		vec3 lightDir = normalize(vec3(-0, -0, -4));
+
+		if(dot(L, -lightDir) > phi)
+		{
+			diffuse = dot(L, N) * diffuseProduct;
+			specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+		}
 
 		gl_Position = projectionMatrix * modelMatrix * vPosition;	// Point position
 		gl_PointSize = vPointSize;		// Point size
@@ -68,14 +76,14 @@
   </head>
  
   <body onload="main()">
-  
+	<p id="pageMode"></p> 
+
   	<!-- <div style="text-align: center"> -->
-	  
 	    <canvas id="webgl" width="400" height="400" style="border: 1px solid black;">
 	    	Please use a browser that supports the "canvas" tag.
 	    </canvas>
-	
 	<!-- </div> -->
 
+	<div id="pageContent"> </div> 
   </body>
 </html>

@@ -11,16 +11,12 @@
  * 	can then be translated in the x,y, or z direction as well as be rotated around the roll, pitch, and yaw
  * 	axis. 
  * 
- * A breathing animation can be enabled that will displace a polygon about its surface normal.
- * 
- * Note: this program is extremely computationally heavy with regards to the breathing animation.
- * 
  * Interactive features:
  *		Press ' p ' - Increase spotlight cut off angle (increase cone angle).
  *		Press ' P ' - Decrease spotlight cut off angle (decrease cone angle).
  *		Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading). 
  *		Press ' M ' - The scene is shaded using flat shading.
-  *		Press ' o ' - Swap between present colors and randomly generated colors. 
+ *		Press ' o ' - Swap between present colors and randomly generated colors. 
  * 		Press ' w ' to reset spotlight angle.
  * 
  */
@@ -53,6 +49,11 @@ var vb = vec4(0.0, 0.942809, 0.333333, 1);
 var vc = vec4(-0.816497, -0.471405, 0.333333, 1);
 var vd = vec4(0.816497, -0.471405, 0.333333,1);
 
+//model
+var avgX = 0;			//Average X to center a model
+var avgY = 0;			//Average Y to center a model
+var avgZ = 0;			//Average Z to center a model
+
 //tree size
 var numberOfBranches = 3;		//number of subtrees within 
 var treeDisplacementX = 2.5;
@@ -63,7 +64,7 @@ var treeLineDecay = 1.5;
 var numberOfObjects = 0;
 
 //point lighting location
-var pointLightPosition = vec4(0.0, 1.0, 5.0, 0.0 );
+var pointLightPosition = vec4(0.0, 1.0, 5.0, 1.0 );
 var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
 var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
@@ -79,7 +80,7 @@ var specularProduct;
 var diffuseProduct;
 
 // spot light
-var phi = 0.99;
+var phi = 0.95;
 
 //yaw rotation variables
 var beta = 0;
@@ -115,6 +116,7 @@ function generateMaterialLighting(){
 		materialShininessList.push(Math.random()*100);
 	}
 }
+
 function modelRotations(){
 	beta +=0.5;
 	if (beta%360==0){
@@ -137,33 +139,25 @@ function main(){
 	}
 
 	generateMaterialLighting();
-
 	console.log(numberOfObjects);
-	// Retrieve <canvas> element
-	var canvas = document.getElementById('webgl');
-
-	// Get the rendering context for WebGL
-	gl = WebGLUtils.setupWebGL(canvas);
+	
+	var canvas = document.getElementById('webgl');	// Retrieve <canvas> element
+	gl = WebGLUtils.setupWebGL(canvas);				// Get the rendering context for WebGL
 	
 	if (!gl){//Check that the return value is not null.
 		console.log('Failed to get the rendering context for WebGL');
 		return;
 	}
 
-	// Initialize shaders
-	program = initShaders(gl, "vshader", "fshader");
+	program = initShaders(gl, "vshader", "fshader");// Initialize shaders
 	gl.useProgram(program);
-
-	//Set up the viewport
-	gl.viewport( 0, 0, 400, 400);
-
+	gl.viewport( 0, 0, canvas.width, canvas.height);//Set up the viewport
 	aspect =  canvas.width/canvas.height;
-	
-	// Set clear color
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);				// Set clear color
 	gl.enable(gl.DEPTH_TEST);	//enable depth testing
-	// gl.enable(gl.CULL_FACE);	//enable culling - default backfacing triangles
+	
+	gl.enable(gl.CULL_FACE);	//enable culling - default backfacing triangles
+	gl.cullFace(gl.FRONT);
 
 	points = [];
 	colors = [];
@@ -176,28 +170,21 @@ function main(){
 
 	projection = gl.getUniformLocation(program, "projectionMatrix");
 	modelView = gl.getUniformLocation(program, "modelMatrix");
-	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-	gl.uniform1f(offsetLoc, 7.5);
-
-	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
 	projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix");
-	aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 	pMatrix = perspective(fovy, aspect, 0.001, 50);
 	gl.uniformMatrix4fv( projection, false, flatten(pMatrix));
 	
-	eye = vec3(0, -5, -25);
+	eye = vec3(0, -5, -20);
 	at = vec3(0.0, -5, 0.0);
 	up = vec3(0.0, 1.0, 0.0);
 	mvMatrix = lookAt(eye, at , up);
 	modelViewMatrix = mvMatrix; 
 
 	process_keypress('');
-
 	render();
 }
-
 
 function render(){
 	index = 0;
@@ -281,11 +268,7 @@ function attach_subtrees(numberOfBranches){
 	mvMatrix = stack.pop();
 }
 
-function draw_cube(color){
-	// materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
-	// materialDiffuse = vec4( 1.0, 0.0, 1.0, 1.0 );
-	// materialSpecular = vec4( 1.0, 0.0, 1.0, 1.0 );
-	// materialShininess = 20.0;
+function draw_cube(){
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
 	materialSpecular = materialSpecularList[index];
@@ -329,11 +312,7 @@ function draw_cube(color){
 	gl.deleteBuffer(nBuffer);
 }
 
-function draw_sphere(color){
-	// materialAmbient = vec4( 0.0, 1.0, 1.0, 1.0 );
-	// materialDiffuse = vec4( 0.0, 1.0, 1.0, 1.0 );
-	// materialSpecular = vec4( 0.0, 1.0, 1.0, 1.0 );
-	// materialShininess = 10.0;
+function draw_sphere(){
 
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
@@ -360,7 +339,6 @@ function draw_sphere(color){
 	}else{
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingnormalsArraySphere), gl.STATIC_DRAW );
 	}
-
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
 	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
@@ -403,11 +381,6 @@ function draw_lines(){
 		vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
 		vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2, 0, 1),	//right verticle line
 		vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2, 0, 1)];	//left verticle line
-
-	// var cColor = [vec4( 1, 1, 1, 1), vec4( 1, 1, 1, 1),		//verticle line
-	// 		vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//horzontal line
-	// 		vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),	//right verticle line
-	// 		vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1)];	//left verticle line
 	
 	var pBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
@@ -441,18 +414,30 @@ function cube(){
 
 	//compute normals
 	var i = 0;
+	var vc  = vec3(0,0,0)
 	while(i<verts.length){
-		gouraudLightingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		i+=1;
+		
+		vc = normal_newell_method([verts[i+3],verts[i+1],verts[i+2],verts[i+0]]);
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		vc = normal_newell_method([verts[i+0],verts[i+1],verts[i+2],verts[i+3]]);
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+		i+=8;
+		console.log(vc)
 	}
 	i = 0;
-	while(i<verts.length){
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		i+=4;
-	}
+	// while(i<verts.length){	
+	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
+	// 	i+=4;
+	// }
 	return verts;
 }
 
@@ -476,19 +461,21 @@ function quad(a, b, c, d)
 	for ( var i = 0; i < indices.length; ++i ){
 		verts.push( vertices[indices[i]] );
 	}
+
 	return verts;
+	
 }
 
 function triangle(a, b, c){
 	pointsArray.push(a);
 	pointsArray.push(b);
 	pointsArray.push(c);
-	// normals are vectors
 
+	// normals are vectors
 	gouraudLightingnormalsArraySphere.push(a[0],a[1], a[2], 0.0);
 	gouraudLightingnormalsArraySphere.push(b[0],b[1], b[2], 0.0);
 	gouraudLightingnormalsArraySphere.push(c[0],c[1], c[2], 0.0);
-
+	
 	flatShadingNormalsArraySphere.push(a[0],a[1], a[2], 0.0);
 	flatShadingNormalsArraySphere.push(a[0],a[1], a[2], 0.0);
 	flatShadingNormalsArraySphere.push(a[0],a[1], a[2], 0.0);
@@ -532,10 +519,10 @@ function normal_newell_method(vectors){
 
 	//mx - sum(y-y_1)*(z+z_1)
 	var sum = 0;
-		for(ii=0;ii<vectors.length-1;ii++){	
-			sum += (vectors[ii][1]-vectors[ii+1][1])*
-				(vectors[ii][2]+vectors[ii+1][2]);	
-		}
+	for(ii=0;ii<vectors.length-1;ii++){	
+		sum += (vectors[ii][1]-vectors[ii+1][1])*
+			(vectors[ii][2]+vectors[ii+1][2]);	
+	}
 	normal[0] = sum;
 	//my - sum(z-z_1)*(x+x_1)
 	var sum = 0;

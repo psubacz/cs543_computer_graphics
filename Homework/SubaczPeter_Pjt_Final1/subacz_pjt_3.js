@@ -11,12 +11,16 @@
  * 	can then be translated in the x,y, or z direction as well as be rotated around the roll, pitch, and yaw
  * 	axis. 
  * 
+ * A breathing animation can be enabled that will displace a polygon about its surface normal.
+ * 
+ * Back face culling is enabled.
+ * 
  * Interactive features:
  *		Press ' p ' - Increase spotlight cut off angle (increase cone angle).
  *		Press ' P ' - Decrease spotlight cut off angle (decrease cone angle).
  *		Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading). 
  *		Press ' M ' - The scene is shaded using flat shading.
- *		Press ' o ' - Swap between present colors and randomly generated colors. 
+  *		Press ' o ' - Swap between present colors and randomly generated colors. 
  * 		Press ' w ' to reset spotlight angle.
  * 
  */
@@ -49,22 +53,17 @@ var vb = vec4(0.0, 0.942809, 0.333333, 1);
 var vc = vec4(-0.816497, -0.471405, 0.333333, 1);
 var vd = vec4(0.816497, -0.471405, 0.333333,1);
 
-//model
-var avgX = 0;			//Average X to center a model
-var avgY = 0;			//Average Y to center a model
-var avgZ = 0;			//Average Z to center a model
-
 //tree size
 var numberOfBranches = 3;		//number of subtrees within 
 var treeDisplacementX = 2.5;
-var treeDisplacementY = 2.5;
+var treeDisplacementY = 3;
 var treeDisplacementZ = 0;
 var treeLineDecay = 1.5;
 
 var numberOfObjects = 0;
 
 //point lighting location
-var pointLightPosition = vec4(0.0, 1.0, 5.0, 1.0 );
+var pointLightPosition = vec4(0.0, 1.0, 5.0, 0.0 );
 var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
 var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
@@ -72,7 +71,7 @@ var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 //Line materials
 var materialAmbient = vec4( 0.0, 0.0, 0.0, 1.0 );
 var materialDiffuse = vec4( 0.0, 0.0, 0.0, 1.0 );
-var materialSpecular = vec4( 0.0, 0.0, 0.0, 1.0 );
+var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 var materialShininess = 100.0;
 
 var diffuseProduct;
@@ -80,7 +79,7 @@ var specularProduct;
 var diffuseProduct;
 
 // spot light
-var phi = 0.95;
+var phi = 0.985;
 
 //yaw rotation variables
 var beta = 0;
@@ -103,7 +102,6 @@ function calculateNumberObjects(numObjects){
 	}
 	numberOfObjects += 1*Math.pow(2,numObjects);
 }
-
 function generateMaterialLighting(){
 	//randomly generate colors of each object
 	calculateNumberObjects(numberOfBranches);
@@ -116,14 +114,12 @@ function generateMaterialLighting(){
 		materialShininessList.push(Math.random()*100);
 	}
 }
-
 function modelRotations(){
 	beta +=0.5;
 	if (beta%360==0){
 		beta = 0;
 	}
 }
-
 function spotlightAngle(dPhi){
 	phi +=dPhi;
 	if (phi%100==1){
@@ -132,32 +128,41 @@ function spotlightAngle(dPhi){
 		phi = 0.945;
 	}
 }
-
 function main(){
 	window.onkeypress = function (event) { //when a key is pressed, process the input
 		process_keypress(event.key)
 	}
 
 	generateMaterialLighting();
+
 	console.log(numberOfObjects);
-	
-	var canvas = document.getElementById('webgl');	// Retrieve <canvas> element
-	gl = WebGLUtils.setupWebGL(canvas);				// Get the rendering context for WebGL
+	// Retrieve <canvas> element
+	var canvas = document.getElementById('webgl');
+
+	// Get the rendering context for WebGL
+	gl = WebGLUtils.setupWebGL(canvas);
 	
 	if (!gl){//Check that the return value is not null.
 		console.log('Failed to get the rendering context for WebGL');
 		return;
 	}
 
-	program = initShaders(gl, "vshader", "fshader");// Initialize shaders
+	// Initialize shaders
+	program = initShaders(gl, "vshader", "fshader");
 	gl.useProgram(program);
-	gl.viewport( 0, 0, canvas.width, canvas.height);//Set up the viewport
-	aspect =  canvas.width/canvas.height;
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);				// Set clear color
-	gl.enable(gl.DEPTH_TEST);	//enable depth testing
+
 	
+	//Set up the viewport
+	gl.viewport( 0, 0, canvas.width, canvas.height);
+
+	aspect =  canvas.width/canvas.height;
+	
+	// Set clear color
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+	gl.enable(gl.DEPTH_TEST);	//enable depth testing
 	gl.enable(gl.CULL_FACE);	//enable culling - default backfacing triangles
-	gl.cullFace(gl.FRONT);
+	gl.cullFace(gl.BACK);		//make sure we are backculling
 
 	points = [];
 	colors = [];
@@ -170,9 +175,14 @@ function main(){
 
 	projection = gl.getUniformLocation(program, "projectionMatrix");
 	modelView = gl.getUniformLocation(program, "modelMatrix");
+	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
+	gl.uniform1f(offsetLoc, 7.5);
+
+	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
 	projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix");
+	// aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 	pMatrix = perspective(fovy, aspect, 0.001, 50);
 	gl.uniformMatrix4fv( projection, false, flatten(pMatrix));
 	
@@ -182,7 +192,8 @@ function main(){
 	mvMatrix = lookAt(eye, at , up);
 	modelViewMatrix = mvMatrix; 
 
-	process_keypress('');
+	process_keypress('m');
+
 	render();
 }
 
@@ -268,7 +279,11 @@ function attach_subtrees(numberOfBranches){
 	mvMatrix = stack.pop();
 }
 
-function draw_cube(){
+function draw_cube(color){
+	// materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
+	// materialDiffuse = vec4( 1.0, 0.0, 1.0, 1.0 );
+	// materialSpecular = vec4( 1.0, 0.0, 1.0, 1.0 );
+	// materialShininess = 20.0;
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
 	materialSpecular = materialSpecularList[index];
@@ -312,8 +327,7 @@ function draw_cube(){
 	gl.deleteBuffer(nBuffer);
 }
 
-function draw_sphere(){
-
+function draw_sphere(color){
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
 	materialSpecular = materialSpecularList[index];
@@ -360,7 +374,7 @@ function draw_sphere(){
 function draw_lines(){
 	materialAmbient = vec4( 0.23125, 0.23125, 0.23125, 1 );
 	materialDiffuse = vec4( 0.2775, 0.2775, 0.2775, 1.0 );
-	materialSpecular = vec4( 0.773911, 0.773911, 0.773911, 1.0 );
+	materialSpecular = vec4( 1, 1, 0.773911, 1.0 );
 	materialShininess = 89.6;
 	diffuseProduct = mult(lightDiffuse, materialDiffuse);
 	specularProduct = mult(lightSpecular, materialSpecular);
@@ -414,30 +428,18 @@ function cube(){
 
 	//compute normals
 	var i = 0;
-	var vc  = vec3(0,0,0)
 	while(i<verts.length){
-		
-		vc = normal_newell_method([verts[i+3],verts[i+1],verts[i+2],verts[i+0]]);
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		vc = normal_newell_method([verts[i+0],verts[i+1],verts[i+2],verts[i+3]]);
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		gouraudLightingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-		i+=8;
-		console.log(vc)
+		gouraudLightingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		i+=1;
 	}
 	i = 0;
-	// while(i<verts.length){	
-	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-	// 	flatShadingNormalsArrayCube.push(vec4(vc[0],vc[1],vc[2],0));
-	// 	i+=4;
-	// }
+	while(i<verts.length){
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		i+=4;
+	}
 	return verts;
 }
 
@@ -461,24 +463,22 @@ function quad(a, b, c, d)
 	for ( var i = 0; i < indices.length; ++i ){
 		verts.push( vertices[indices[i]] );
 	}
-
 	return verts;
-	
 }
 
 function triangle(a, b, c){
 	pointsArray.push(a);
 	pointsArray.push(b);
 	pointsArray.push(c);
-
 	// normals are vectors
-	gouraudLightingnormalsArraySphere.push(a[0],a[1], a[2], 0.0);
-	gouraudLightingnormalsArraySphere.push(b[0],b[1], b[2], 0.0);
-	gouraudLightingnormalsArraySphere.push(c[0],c[1], c[2], 0.0);
-	
-	flatShadingNormalsArraySphere.push(a[0],a[1], a[2], 0.0);
-	flatShadingNormalsArraySphere.push(a[0],a[1], a[2], 0.0);
-	flatShadingNormalsArraySphere.push(a[0],a[1], a[2], 0.0);
+	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
+	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
+	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
+
+	var vc  = normal_newell_method([a,b,c,a]);
+	gouraudLightingnormalsArraySphere.push(vc[0],vc[1], vc[2], 0.0);
+	gouraudLightingnormalsArraySphere.push(vc[0],vc[1], vc[2], 0.0);
+	gouraudLightingnormalsArraySphere.push(vc[0],vc[1], vc[2], 0.0);
 }
 
 function divideTriangle(a, b, c, count) {
@@ -519,10 +519,10 @@ function normal_newell_method(vectors){
 
 	//mx - sum(y-y_1)*(z+z_1)
 	var sum = 0;
-	for(ii=0;ii<vectors.length-1;ii++){	
-		sum += (vectors[ii][1]-vectors[ii+1][1])*
-			(vectors[ii][2]+vectors[ii+1][2]);	
-	}
+		for(ii=0;ii<vectors.length-1;ii++){	
+			sum += (vectors[ii][1]-vectors[ii+1][1])*
+				(vectors[ii][2]+vectors[ii+1][2]);	
+		}
 	normal[0] = sum;
 	//my - sum(z-z_1)*(x+x_1)
 	var sum = 0;
@@ -563,6 +563,7 @@ function process_keypress(theKey){
 				flatShading = false;
 			}else{
 				gouraudLighting = false;
+				flatShading = true;
 			}
 			break;
 		case 'M':
@@ -572,6 +573,7 @@ function process_keypress(theKey){
 				gouraudLighting = false;
 			}else{
 				flatShading = false;
+				gouraudLighting = true;
 			}
 			break;
 

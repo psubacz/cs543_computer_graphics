@@ -4,14 +4,11 @@
  * 
  * @author Peter Subacz
  * 
- * using multiple draw calls example: https://webglfundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
- * strats to draw multiple objects to a screen: 
  * 
- * This program allows a user to upload a ply file and draw that file as a polygon mesh to the screen. The mesh
- * 	can then be translated in the x,y, or z direction as well as be rotated around the roll, pitch, and yaw
- * 	axis. 
+ * This program creates a hierachy model of cubes and spheres that hang on wire lines. The model
+ *   rotates around the y axis and sub tier models rotate counter clockwise. The cubes and spheres 
+ * 	 are generated and randomly assigned material diffuse, ambient, and specular coefficients.
  * 
- * A breathing animation can be enabled that will displace a polygon about its surface normal.
  * 
  * Back face culling is enabled.
  * 
@@ -25,18 +22,20 @@
  * 
  */
 
-var gl;	//webgl
-var id; //animation id
-
-var fovy = 60.0;  // Field-of-view in Y direction angle (in degrees)
-var aspect;       // Viewport aspect ratio
-var program;
-
-var mvMatrix, pMatrix;
-var modelView, projection;
+var gl;						// webgl
+var id; 					// animation id
+var fovy = 60.0; 			// Field-of-view in Y direction angle (in degrees)
+var aspect;       			// Viewport aspect ratio
+var program;				// webgl program
+var mvMatrix, projectionMatrix;
+var modelViewMatrixLoc;
+var diffuseProduct;
+var specularProduct;
+var diffuseProduct;
 var eye;
 
-var stack = []; //Hierarchy model stack
+//Hierarchy model stack
+var stack = []; 
 
 //cubes 
 var gouraudLightingNormalsArrayCube = [];
@@ -55,30 +54,19 @@ var vd = vec4(0.816497, -0.471405, 0.333333,1);
 
 //tree size
 var numberOfBranches = 3;		//number of subtrees within 
-var treeDisplacementX = 2.5;
-var treeDisplacementY = 3;
-var treeDisplacementZ = 0;
-var treeLineDecay = 1.5;
-
-var numberOfObjects = 0;
+var treeDisplacementX = 2.5;	//tree x displacement
+var treeDisplacementY = 3;		//tree y displacement
+var treeDisplacementZ = 0;		//tree z displacement
+var treeLineDecay = 1.5;		//line decay per recusive tree
+var numberOfObjects = 0;		//number of objects on the tree
 
 //point lighting location
-var pointLightPosition = vec4(0.0, 1.0, 5.0, 0.0 );
+var pointLightPosition = vec4(0.0, 0.0, 5.0, 0.0 );
 var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
 var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 
-//Line materials
-var materialAmbient = vec4( 0.0, 0.0, 0.0, 1.0 );
-var materialDiffuse = vec4( 0.0, 0.0, 0.0, 1.0 );
-var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
-var materialShininess = 100.0;
-
-var diffuseProduct;
-var specularProduct;
-var diffuseProduct;
-
-// spot light
+// spot light angle
 var phi = 0.985;
 
 //yaw rotation variables
@@ -89,6 +77,7 @@ var animation = true;
 var gouraudLighting = false;
 var flatShading = false;
 
+// materials list and index
 var index = 0;
 var materialAmbientList = [];
 var materialDiffuseList = [];
@@ -100,12 +89,11 @@ function calculateNumberObjects(numObjects){
 	if (numObjects>0){
 		calculateNumberObjects(numObjects-1);
 	}
-	numberOfObjects += 1*Math.pow(2,numObjects);
+	numberOfObjects += Math.pow(2,numObjects);
 }
 function generateMaterialLighting(){
 	//randomly generate colors of each object
 	calculateNumberObjects(numberOfBranches);
-
 	for (var i = 0;i<numberOfObjects;i++){
 		randomVec = vec4(Math.random(),Math.random(),Math.random(),1)
 		materialAmbientList.push(randomVec);
@@ -115,12 +103,14 @@ function generateMaterialLighting(){
 	}
 }
 function modelRotations(){
+	// incrementes beta by 0.5 degrees. If beta reaches 360 degree, reset to 0
 	beta +=0.5;
 	if (beta%360==0){
 		beta = 0;
 	}
 }
-function spotlightAngle(dPhi){
+function setSpotlightAngle(dPhi){
+	//set min and max thresholds for the spotlight angle
 	phi +=dPhi;
 	if (phi%100==1){
 		phi = 0.999;
@@ -129,78 +119,47 @@ function spotlightAngle(dPhi){
 	}
 }
 function main(){
-	window.onkeypress = function (event) { //when a key is pressed, process the input
-		process_keypress(event.key)
+	window.onkeypress = function (event) {		 	//when a key is pressed, process the input
+		process_keypress(event.key);
 	}
-
-	generateMaterialLighting();
-
-	console.log(numberOfObjects);
-	// Retrieve <canvas> element
-	var canvas = document.getElementById('webgl');
-
-	// Get the rendering context for WebGL
-	gl = WebGLUtils.setupWebGL(canvas);
+	generateMaterialLighting();						//randomly generate lighting coefficients
+	var canvas = document.getElementById('webgl');	// Retrieve <canvas> element
+	gl = WebGLUtils.setupWebGL(canvas);				// Get the rendering context for WebGL
 	
-	if (!gl){//Check that the return value is not null.
+	if (!gl){										//Check that the return value is not null.
 		console.log('Failed to get the rendering context for WebGL');
 		return;
 	}
+	program = initShaders(gl, "vshader", "fshader");// Initialize shaders
+	gl.useProgram(program);							// Tell welgl which program to use
+	gl.viewport( 0, 0, canvas.width, canvas.height);//Set up the viewport
+	aspect =  canvas.width/canvas.height;			//calculate the apsect ratio
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);				// Set clear color
+	gl.enable(gl.DEPTH_TEST);						//enable depth testing
+	gl.enable(gl.CULL_FACE);						//enable culling - default backfacing triangles
+	gl.cullFace(gl.BACK);							//make sure we are backculling
 
-	// Initialize shaders
-	program = initShaders(gl, "vshader", "fshader");
-	gl.useProgram(program);
-
-	
-	//Set up the viewport
-	gl.viewport( 0, 0, canvas.width, canvas.height);
-
-	aspect =  canvas.width/canvas.height;
-	
-	// Set clear color
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
-	gl.enable(gl.DEPTH_TEST);	//enable depth testing
-	gl.enable(gl.CULL_FACE);	//enable culling - default backfacing triangles
-	gl.cullFace(gl.BACK);		//make sure we are backculling
-
-	points = [];
-	colors = [];
-
-	diffuseProduct = mult(lightDiffuse, materialDiffuse);
-	specularProduct = mult(lightSpecular, materialSpecular);
-	ambientProduct = mult(lightAmbient, materialAmbient);
-
-	tetrahedron(va, vb, vc, vd, numTimesToSubdivide);
-
-	projection = gl.getUniformLocation(program, "projectionMatrix");
-	modelView = gl.getUniformLocation(program, "modelMatrix");
-	var offsetLoc = gl.getUniformLocation(program, "vPointSize");
-	gl.uniform1f(offsetLoc, 7.5);
-
-	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	tetrahedron(va, vb, vc, vd, numTimesToSubdivide);//create a sphere
 
 	modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
 	projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix");
-	// aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-	pMatrix = perspective(fovy, aspect, 0.001, 50);
-	gl.uniformMatrix4fv( projection, false, flatten(pMatrix));
-	
+
+	projectionMatrix = perspective(fovy, aspect, 0.001, 50);
+	gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix));
+
 	eye = vec3(0, -5, -20);
 	at = vec3(0.0, -5, 0.0);
 	up = vec3(0.0, 1.0, 0.0);
 	mvMatrix = lookAt(eye, at , up);
 	modelViewMatrix = mvMatrix; 
-
 	process_keypress('m');
-
 	render();
 }
 
 function render(){
 	index = 0;
-	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.uniform1f(gl.getUniformLocation(program, "phi"), phi);
+	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
+	gl.uniform1f(gl.getUniformLocation(program, "phi"), phi);	//set spotlight angle
 	computeHierarchyModel();	//compute hierachy model
 	if (animation){ 			//recursive animation 
 		id = requestAnimationFrame(render);
@@ -229,7 +188,7 @@ function computeHierarchyModel(){
 	
 	modelRotations(); // Increment rotation angle
 	mvMatrix = mult(mvMatrix,rotateY(-beta));					// Rotations 
-	gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));	// 
+	gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));	// 
 	draw_sphere();	// draw the root sphere
 	treeDisplacementX = 10;										// reset tree displacement
 	attach_subtrees(numberOfBranches);							
@@ -237,7 +196,7 @@ function computeHierarchyModel(){
 
 function attach_subtrees(numberOfBranches){
 	/* 
-		Recusively attach lower leveled objects.
+		Recusively attach lower leveled objects in the hierarachy model
 	*/
 	stack.push(mvMatrix);
 	treeDisplacementX /=2;
@@ -247,7 +206,7 @@ function attach_subtrees(numberOfBranches){
 			//draw the right object
 			mvMatrix = mult(mvMatrix, translate(treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(2*beta));
-			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
 			draw_cube();
 			attach_subtrees(numberOfBranches-1);
 			//draw the left object
@@ -255,14 +214,14 @@ function attach_subtrees(numberOfBranches){
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(2*beta));
-			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix) );
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
 			draw_cube();
 			attach_subtrees(numberOfBranches-1);
 		}else{
 			//draw the right object
 			mvMatrix = mult(mvMatrix, translate(treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(-2*beta));
-			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
 			draw_sphere();
 			attach_subtrees(numberOfBranches-1);
 			// draw the left object
@@ -270,7 +229,7 @@ function attach_subtrees(numberOfBranches){
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix,translate(-treeDisplacementX, -treeDisplacementY, 0));
 			mvMatrix = mult(mvMatrix, rotateY(-2*beta));
-			gl.uniformMatrix4fv( modelView, false, flatten(mvMatrix));
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
 			draw_sphere();
 			attach_subtrees(numberOfBranches-1);
 		}
@@ -279,20 +238,18 @@ function attach_subtrees(numberOfBranches){
 	mvMatrix = stack.pop();
 }
 
-function draw_cube(color){
-	// materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
-	// materialDiffuse = vec4( 1.0, 0.0, 1.0, 1.0 );
-	// materialSpecular = vec4( 1.0, 0.0, 1.0, 1.0 );
-	// materialShininess = 20.0;
+function draw_cube(){
+	//set materials for each draw call
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
 	materialSpecular = materialSpecularList[index];
 	materialShininess = materialShininessList[index];
 	index+=1;
+	//compute matrix multication
 	diffuseProduct = mult(lightDiffuse, materialDiffuse);
 	specularProduct = mult(lightSpecular, materialSpecular);
 	ambientProduct = mult(lightAmbient, materialAmbient);
-
+	// pass to vertex shader
 	gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
 	gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
 	gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
@@ -320,30 +277,31 @@ function draw_cube(color){
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
 	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
 	gl.enableVertexAttribArray( vNormal);
-
 	gl.drawArrays( gl.TRIANGLES, 0, theCube.length);
 
+	//delete the buffer for memory management
 	gl.deleteBuffer(pBuffer);
 	gl.deleteBuffer(nBuffer);
 }
 
 function draw_sphere(color){
+	//set materials for each draw call
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
 	materialSpecular = materialSpecularList[index];
 	materialShininess = materialShininessList[index];
 	index+=1;
-
+	//compute matrix multication
 	diffuseProduct = mult(lightDiffuse, materialDiffuse);
 	specularProduct = mult(lightSpecular, materialSpecular);
 	ambientProduct = mult(lightAmbient, materialAmbient);
-
+	// pass to vertex shader
 	gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
 	gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
 	gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
 	gl.uniform4fv(gl.getUniformLocation(program, "pointLightPosition"), flatten(pointLightPosition));
 	gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
-	
+
 	var nBuffer = gl.createBuffer();
 	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
 	if(gouraudLighting == true){
@@ -372,9 +330,9 @@ function draw_sphere(color){
 }
 
 function draw_lines(){
-	materialAmbient = vec4( 0.23125, 0.23125, 0.23125, 1 );
-	materialDiffuse = vec4( 0.2775, 0.2775, 0.2775, 1.0 );
-	materialSpecular = vec4( 1, 1, 0.773911, 1.0 );
+	materialAmbient = vec4( 0.23125, 0.23125, 0.23125, 0 );
+	materialDiffuse = vec4( 0.2775, 0.2775, 0.2775, 0 );
+	materialSpecular = vec4( 1, 1, 0.773911, 0 );
 	materialShininess = 89.6;
 	diffuseProduct = mult(lightDiffuse, materialDiffuse);
 	specularProduct = mult(lightSpecular, materialSpecular);
@@ -386,10 +344,10 @@ function draw_lines(){
 	gl.uniform4fv(gl.getUniformLocation(program, "pointLightPosition"), flatten(pointLightPosition));
 	gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
 	
-	var cCenter = [vec4( 0, -0.5, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
+	var cCenter = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
-					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2, 0, 1),	//right verticle line
-					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2, 0, 1)];	//left verticle line
+					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.25, 0, 1),	//right verticle line
+					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.25, 0, 1)];	//left verticle line
 
 	var cColor = [vec4( 0, -0.5, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 		vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
@@ -470,11 +428,13 @@ function triangle(a, b, c){
 	pointsArray.push(a);
 	pointsArray.push(b);
 	pointsArray.push(c);
+
 	// normals are vectors
 	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
 	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
 	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
 
+	//calculate normals and use as points on the sphere
 	var vc  = normal_newell_method([a,b,c,a]);
 	gouraudLightingnormalsArraySphere.push(vc[0],vc[1], vc[2], 0.0);
 	gouraudLightingnormalsArraySphere.push(vc[0],vc[1], vc[2], 0.0);
@@ -550,11 +510,11 @@ function process_keypress(theKey){
 	switch (theKey) {
 		case 'p':
 			//increasing angle by +0.01
-			spotlightAngle(0.001);
+			setSpotlightAngle(0.001);
 			break;
 		case 'P':
 			//decreasing angle by -0.01
-			spotlightAngle(-0.001);
+			setSpotlightAngle(-0.001);
 			break;
 		case 'm':
 			//Gouraud lighting 

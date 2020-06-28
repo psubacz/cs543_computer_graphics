@@ -7,38 +7,28 @@ These folder contain:
     - cs4731_pjt2_ply_files (directory)
     - lib (directory)
 
-This project draws .ply ingests .ply files and displays the object in a html canvas.
-The project has the following modes:
- * 	Translate around the XYZ:
- * 		Press ' X ' or ' x ' Translate your wireframe in the + x
- * 		Press ' C ' or ' c ' Translate your wireframe in the - x
- * 		Press ' y ' or ' y ' Translate your wireframe in the + y
- * 		Press ' U ' or ' u ' Translate your wireframe in the - y
- * 		Press ' Z ' or ' z ' Translate your wireframe in the + z
- * 		Press ' A ' or ' a ' Translate your wireframe in the - z
- * 	Rotate around the Roll,Pitch,Yaw
- * 		Press ' R ' or ' r ' Rotate your wireframe in an + Roll
- * 		Press ' T ' or ' t ' Rotate your wireframe in an - Roll
- * 		Press ' P ' or ' P ' Rotate your wireframe in an - Pitch
- * 		Press ' O ' or ' o ' Rotate your wireframe in an + Pitch
- * 		Press ' K ' or ' k ' Rotate your wireframe in an + Yaw
- * 		Press ' L ' or ' l ' Rotate your wireframe in an - Yaw
- * 	Breathing animation
- * 		Press ' B ' or ' b ' to toggle the breathing (pulsing).
- * 	Draw normal lines
- * 		Press ' D ' or ' d ' to toggle the normal lines.
- * 	Randomize colors
- * 		Press ' E ' or ' e ' to randomize the line colors
- * 	Reset rotations and Translations
- * 		Press ' Q ' or ' q ' to turn off active modes.
- * 		Press ' W ' or ' w ' to reset model to origin.
+
+This program creates a hierachy model of cubes and spheres that hang on wire lines. The model
+    rotates around the y axis and sub tier models rotate counter clockwise. The cubes and spheres 
+    are generated and randomly assigned material diffuse, ambient, and specular coefficients.
+
+Back face culling is enabled.
+
+Interactive features:
+    Press ' p ' - Increase spotlight cut off angle (increase cone angle).
+    Press ' P ' - Decrease spotlight cut off angle (decrease cone angle).
+    Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading). 
+    Press ' M ' - The scene is shaded using flat shading.
+    Press ' n ' - Swap between present colors and randomly generated colors. 
+    Press ' w ' to reset spotlight angle.
 
 At runtime, the program:
-0.  Reset translations and reset rotations
-1.  Ingest a file
-2.  Build polygons 
-2.1 Calculate normals
-2.2 Calculate centroids
-2.3 Calculate pulses
-3.  Calculate animation delay
-4.  Recusively render
+0.  setup variable
+1.  Initalized model and create materials 
+1.1 Enable culling of backfacing triangles
+1.2 Enable depth testing
+1.3 Set projection matrix
+1.4 Build sphere and cubes 
+2.  Render the model
+2.1 Increment the rotation angle
+2.2 Recurviely compute hierarchy model and attach subtrees

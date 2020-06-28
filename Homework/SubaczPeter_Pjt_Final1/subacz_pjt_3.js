@@ -17,7 +17,7 @@
  *		Press ' P ' - Decrease spotlight cut off angle (decrease cone angle).
  *		Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading). 
  *		Press ' M ' - The scene is shaded using flat shading.
-  *		Press ' o ' - Swap between present colors and randomly generated colors. 
+  *		Press ' n ' - Swap between present colors and randomly generated colors. 
  * 		Press ' w ' to reset spotlight angle.
  * 
  */
@@ -84,6 +84,10 @@ var materialDiffuseList = [];
 var materialSpecularList = [];
 var materialShininessList = [];
 
+//
+var useLighting = false;
+
+
 function calculateNumberObjects(numObjects){
 	//recusively calculate the number of objects on the screen.
 	if (numObjects>0){
@@ -91,7 +95,13 @@ function calculateNumberObjects(numObjects){
 	}
 	numberOfObjects += Math.pow(2,numObjects);
 }
+
 function generateMaterialLighting(){
+	materialAmbientList = [];
+	materialDiffuseList = [];
+	materialSpecularList = [];
+	materialShininessList = [];
+
 	//randomly generate colors of each object
 	calculateNumberObjects(numberOfBranches);
 	for (var i = 0;i<numberOfObjects;i++){
@@ -102,6 +112,7 @@ function generateMaterialLighting(){
 		materialShininessList.push(Math.random()*100);
 	}
 }
+
 function modelRotations(){
 	// incrementes beta by 0.5 degrees. If beta reaches 360 degree, reset to 0
 	beta +=0.5;
@@ -109,6 +120,7 @@ function modelRotations(){
 		beta = 0;
 	}
 }
+
 function setSpotlightAngle(dPhi){
 	//set min and max thresholds for the spotlight angle
 	phi +=dPhi;
@@ -118,6 +130,7 @@ function setSpotlightAngle(dPhi){
 		phi = 0.945;
 	}
 }
+
 function main(){
 	window.onkeypress = function (event) {		 	//when a key is pressed, process the input
 		process_keypress(event.key);
@@ -239,6 +252,7 @@ function attach_subtrees(numberOfBranches){
 }
 
 function draw_cube(){
+	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), true);
 	//set materials for each draw call
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
@@ -284,7 +298,9 @@ function draw_cube(){
 	gl.deleteBuffer(nBuffer);
 }
 
-function draw_sphere(color){
+function draw_sphere(){
+	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), true);
+	
 	//set materials for each draw call
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
@@ -330,29 +346,17 @@ function draw_sphere(color){
 }
 
 function draw_lines(){
-	materialAmbient = vec4( 0.23125, 0.23125, 0.23125, 0 );
-	materialDiffuse = vec4( 0.2775, 0.2775, 0.2775, 0 );
-	materialSpecular = vec4( 1, 1, 0.773911, 0 );
-	materialShininess = 89.6;
-	diffuseProduct = mult(lightDiffuse, materialDiffuse);
-	specularProduct = mult(lightSpecular, materialSpecular);
-	ambientProduct = mult(lightAmbient, materialAmbient);
+	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
 
-	gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
-	gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
-	gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
-	gl.uniform4fv(gl.getUniformLocation(program, "pointLightPosition"), flatten(pointLightPosition));
-	gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
-	
 	var cCenter = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
 					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.25, 0, 1),	//right verticle line
 					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.25, 0, 1)];	//left verticle line
 
-	var cColor = [vec4( 0, -0.5, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
-		vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
-		vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2, 0, 1),	//right verticle line
-		vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2, 0, 1)];	//left verticle line
+	var cColor = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
+		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),		//horzontal line
+		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),	//right verticle line
+		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];	//left verticle line
 	
 	var pBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
@@ -536,21 +540,22 @@ function process_keypress(theKey){
 				gouraudLighting = true;
 			}
 			break;
-
+		case 'n':
+			generateMaterialLighting();
+			break;
 		case 'w':
 			phi = 0.99;
 			break;
 
-		default:
-			// var outputMessage = 'No function set for keypress: ' + theKey + '<br>';		//clear the output message			
+		default:		
 	}
-	
 	outputMessage = 'Current keypress actions are: <br>';
 	outputMessage += '- Interaction: <br>';
 	outputMessage += "-- Press ' p ' - Increase spotlight cut off angle (increase cone angle).<br>";
 	outputMessage += "-- Press ' P ' - Decrease spotlight cut off angle (decrease cone angle) .<br>";
 	outputMessage += "-- Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading) .<br>";
 	outputMessage += "-- Press ' M ' - The scene is shaded using flat shading . <br>";
+	outputMessage += "-- Press ' n ' - Change the color properties. <br>";
 	outputMessage += '- Reset <br>';
 	outputMessage += "-- Press ' W ' or ' w ' to reset spotlight angle. <br>";
 	document.getElementById('pageContent').innerHTML = outputMessage;

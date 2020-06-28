@@ -67,7 +67,7 @@ var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 
 // spot light angle
-var phi = 0.985;
+var phi = 0.97;
 
 //yaw rotation variables
 var beta = 0;
@@ -84,8 +84,6 @@ var materialDiffuseList = [];
 var materialSpecularList = [];
 var materialShininessList = [];
 
-//
-var useLighting = false;
 
 
 function calculateNumberObjects(numObjects){
@@ -391,16 +389,15 @@ function cube(){
 	//compute normals
 	var i = 0;
 	while(i<verts.length){
-		gouraudLightingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		i+=1;
-	}
-	i = 0;
-	while(i<verts.length){
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		i+=4;
+
+		var vc  = normal_newell_method([verts[i],verts[i+1],verts[i+2],verts[i]]);
+		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
+		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
+		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
+		i+=3;
 	}
 	return verts;
 }

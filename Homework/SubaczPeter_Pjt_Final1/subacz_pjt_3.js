@@ -352,9 +352,9 @@ function draw_lines(){
 					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.25, 0, 1)];	//left verticle line
 
 	var cColor = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
-		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),		//horzontal line
-		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),	//right verticle line
-		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];	//left verticle line
+		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//horzontal line
+		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//right verticle line
+		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];				//left verticle line
 	
 	var pBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);

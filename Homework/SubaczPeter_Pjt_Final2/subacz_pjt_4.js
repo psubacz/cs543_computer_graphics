@@ -84,7 +84,9 @@ var materialDiffuseList = [];
 var materialSpecularList = [];
 var materialShininessList = [];
 
-// texture urls 
+//walls and floor
+var thePlane = plane();
+var planeScale = 30;
 var grassURL = 'http://web.cs.wpi.edu/~jmcuneo/grass.bmp'; //grass
 var stonesURL = 'http://web.cs.wpi.edu/~jmcuneo/stones.bmp'; //stones
 var environmentMapNegativeX = 'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvnegx.bmp';//Environment Map - Negative X
@@ -93,10 +95,6 @@ var environmentMapNegativeZ = 'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvne
 var environmentMapPositiveX = 'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposx.bmp';//Environment Map - Positive X
 var environmentMapPositiveY = 'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposy.bmp';//Environment Map - Positive Y
 var environmentMapPositiveZ = 'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposz.bmp';//Environment Map - Positive Z
-
-var leftWall = [];
-var rightWall = [];
-var floor = [];
 
 function calculateNumberObjects(numObjects){
 	//recusively calculate the number of objects on the screen.
@@ -123,9 +121,9 @@ function generateMaterialLighting(){
 	}
 }
 
-function modelRotations(){
+function modelRotations(direction){
 	// incrementes beta by 0.5 degrees. If beta reaches 360 degree, reset to 0
-	beta += 3;
+	beta +=0.5*direction;
 	if (beta%360==0){
 		beta = 0;
 	}
@@ -176,6 +174,9 @@ function main(){
 	mvMatrix = lookAt(eye, at , up);
 	modelViewMatrix = mvMatrix; 
 	process_keypress('m');
+
+	
+
 	render();
 }
 
@@ -183,14 +184,15 @@ function render(){
 	index = 0;
 	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
 	gl.uniform1f(gl.getUniformLocation(program, "phi"), phi);	//set spotlight angle
-	computeHierarchyModel();	//compute hierachy model
+	computeHierarchyModel();	//compute hierachy model	
 	draw_background(); 			//draw floor and wall planes
+
+	mvMatrix = modelViewMatrix; 
+	update_state_output()
 
 	if (animation){ 			//recursive animation 
 		id = requestAnimationFrame(render);
 	}
-	mvMatrix = modelViewMatrix; 
-	update_state_output();
 }
 
 function computeHierarchyModel(){
@@ -211,12 +213,13 @@ function computeHierarchyModel(){
 		3. Repeat steps 1 & 2 for each level.
 	*/
 	
-	modelRotations(); // Increment rotation angle
+	modelRotations(1); // Increment rotation angle
 	mvMatrix = mult(mvMatrix,rotateY(-beta));					// Rotations 
 	gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));	// 
 	draw_sphere();	// draw the root sphere
 	treeDisplacementX = 10;										// reset tree displacement
-	attach_subtrees(numberOfBranches);							
+	attach_subtrees(numberOfBranches);	
+			
 }
 
 function attach_subtrees(numberOfBranches){
@@ -258,54 +261,14 @@ function attach_subtrees(numberOfBranches){
 			draw_sphere();
 			attach_subtrees(numberOfBranches-1);
 		}
-	}else{
-		//do nothing		
 	}
 	treeDisplacementX*=2;
 	mvMatrix = stack.pop();
 }
 
-function draw_background(){
-	// mvMatrix = mult(mvMatrix, rotateY(-2*beta));
-	// 		mvMatrix = mult(mvMatrix, translate(-treeDisplacementX, treeDisplacementY, 0));
-	// 		mvMatrix = mult(mvMatrix, translate(-treeDisplacementX, -treeDisplacementY, 0));
-	// 		mvMatrix = mult(mvMatrix, rotateY(2*beta));
-			
-	//
-	mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(2,2,2));
-	gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
-	// leftWall = [];
-	// rightWall = [vec4];
-	floor = plane();
-
-	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
-
-	var cColor = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),vec4(  1, 1, 1, 1),
-					vec4( 1, 1, 1, 1),vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];
-	
-	var pBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(floor), gl.STATIC_DRAW);
-
-	var vPosition = gl.getAttribLocation(program,  "vPosition");
-	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
-	
-	var nBuffer = gl.createBuffer();
-	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
-	gl.bufferData( gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW );
-
-	var vNormal = gl.getAttribLocation( program, "vNormal" );
-	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
-	gl.enableVertexAttribArray( vNormal)
-
-	gl.drawArrays(gl.TRIANGLES, 0,6);
-	gl.deleteBuffer(pBuffer);
-	gl.deleteBuffer(nBuffer);
-}
-
 function draw_cube(){
 	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), true);
+	
 	//set materials for each draw call
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
@@ -335,10 +298,13 @@ function draw_cube(){
 	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
 	if(gouraudLighting == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingNormalsArrayCube), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}else if(flatShading == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(flatShadingNormalsArrayCube), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), true);
 	}else{
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingNormalsArrayCube), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
@@ -375,10 +341,13 @@ function draw_sphere(){
 	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
 	if(gouraudLighting == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingnormalsArraySphere), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}else if(flatShading == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(flatShadingNormalsArraySphere), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), true);
 	}else{
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingnormalsArraySphere), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
@@ -403,8 +372,8 @@ function draw_lines(){
 
 	var cCenter = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
-					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.25, 0, 1),	//right verticle line
-					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.25, 0, 1)];	//left verticle line
+					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.5, 0, 1),	//right verticle line
+					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.5, 0, 1)];	//left verticle line
 
 	var cColor = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
 		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//horzontal line
@@ -432,9 +401,67 @@ function draw_lines(){
 	gl.deleteBuffer(nBuffer);
 }
 
+function draw_background(){
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateY(beta));
+		mvMatrix = mult(mvMatrix, rotateX(90));
+		mvMatrix = mult(mvMatrix, rotateZ(45));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 30));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(0,1,0,1));
+	mvMatrix = stack.pop();
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateY(beta+45));
+		mvMatrix = mult(mvMatrix, rotateX(0));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 25));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(1,0,0,1));
+	mvMatrix = stack.pop();
+	
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateY(beta-45));
+		mvMatrix = mult(mvMatrix, rotateX(0));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 25));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(1,1,0,1));
+	mvMatrix = stack.pop();	
+}
+
+function drawPlane(color){
+
+	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
+	var cColor = [];
+	for(i = 0; i<thePlane.length;i++){
+		cColor.push(color);
+	};
+	
+	var pBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(thePlane), gl.STATIC_DRAW);
+
+	var vPosition = gl.getAttribLocation(program,  "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
+	
+	var nBuffer = gl.createBuffer();
+	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
+	gl.bufferData( gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW );
+
+	var vNormal = gl.getAttribLocation( program, "vNormal" );
+	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
+	gl.enableVertexAttribArray( vNormal)
+
+	gl.drawArrays(gl.TRIANGLES, 0,6);
+	gl.deleteBuffer(pBuffer);
+	gl.deleteBuffer(nBuffer);
+}
+
 function plane(){
 	var verts = [];
-	verts = verts.concat(quad( 1, 0, 3, 2 ));
+	verts = verts.concat(quad(  4, 5, 6, 7 ));
 	//compute normals
 	var i = 0;
 	while(i<verts.length){
@@ -466,7 +493,10 @@ function cube(){
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-
+		i+=3;
+	}
+	var i = 0;
+	while(i<verts.length){
 		var vc  = normal_newell_method([verts[i],verts[i+1],verts[i+2],verts[i]]);
 		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
 		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
@@ -481,14 +511,14 @@ function quad(a, b, c, d)
 	var verts = [];
 
 	var vertices = [
-		vec4( -0.5, -0.5,  0.5, 1.0 ), //0
-		vec4( -0.5,  0.5,  0.5, 1.0 ), //1
-		vec4(  0.5,  0.5,  0.5, 1.0 ), //2
-		vec4(  0.5, -0.5,  0.5, 1.0 ), //3
-		vec4( -0.5, -0.5, -0.5, 1.0 ), //4
-		vec4( -0.5,  0.5, -0.5, 1.0 ), //5
-		vec4(  0.5,  0.5, -0.5, 1.0 ), //6
-		vec4(  0.5, -0.5, -0.5, 1.0 )  //7
+		vec4( -0.5, -0.5,  0.5, 1.0 ),
+		vec4( -0.5,  0.5,  0.5, 1.0 ),
+		vec4(  0.5,  0.5,  0.5, 1.0 ),
+		vec4(  0.5, -0.5,  0.5, 1.0 ),
+		vec4( -0.5, -0.5, -0.5, 1.0 ),
+		vec4( -0.5,  0.5, -0.5, 1.0 ),
+		vec4(  0.5,  0.5, -0.5, 1.0 ),
+		vec4(  0.5, -0.5, -0.5, 1.0 )
 	];
 
 	var indices = [ a, b, c, a, c, d ];

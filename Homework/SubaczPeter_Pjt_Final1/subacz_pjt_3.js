@@ -164,6 +164,9 @@ function main(){
 	mvMatrix = lookAt(eye, at , up);
 	modelViewMatrix = mvMatrix; 
 	process_keypress('m');
+
+	
+
 	render();
 }
 
@@ -251,6 +254,7 @@ function attach_subtrees(numberOfBranches){
 
 function draw_cube(){
 	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), true);
+	
 	//set materials for each draw call
 	materialAmbient = materialAmbientList[index];
 	materialDiffuse = materialDiffuseList[index];
@@ -280,10 +284,13 @@ function draw_cube(){
 	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
 	if(gouraudLighting == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingNormalsArrayCube), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}else if(flatShading == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(flatShadingNormalsArrayCube), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), true);
 	}else{
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingNormalsArrayCube), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
@@ -320,10 +327,13 @@ function draw_sphere(){
 	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
 	if(gouraudLighting == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingnormalsArraySphere), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}else if(flatShading == true){
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(flatShadingNormalsArraySphere), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), true);
 	}else{
 		gl.bufferData( gl.ARRAY_BUFFER, flatten(gouraudLightingnormalsArraySphere), gl.STATIC_DRAW );
+		gl.uniform1i(gl.getUniformLocation(program, "useNormals"), false);
 	}
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
@@ -348,8 +358,8 @@ function draw_lines(){
 
 	var cCenter = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
-					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.25, 0, 1),	//right verticle line
-					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.25, 0, 1)];	//left verticle line
+					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.5, 0, 1),	//right verticle line
+					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.5, 0, 1)];	//left verticle line
 
 	var cColor = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
 		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//horzontal line
@@ -392,7 +402,10 @@ function cube(){
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
 		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-
+		i+=3;
+	}
+	var i = 0;
+	while(i<verts.length){
 		var vc  = normal_newell_method([verts[i],verts[i+1],verts[i+2],verts[i]]);
 		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
 		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));

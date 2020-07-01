@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Subacz Project 3 part 1</title>
+    <title>Subacz Project 3</title>
  
 	<script id="vshader" type="x-shader/x-vertex">
 	attribute vec4 vPosition, vNormal, vColor;
@@ -15,14 +15,20 @@
 	uniform float vPointSize;
 	uniform float phi;
 	uniform bool useLighting;
+	uniform bool useNormals;
+	
 
 	void main() {
 		gl_Position = projectionMatrix * modelViewMatrix * vPosition;	// Point position
 		gl_PointSize = vPointSize;		// Point size
+		vec3 pos;
 		if (useLighting == true){
 			// Convert model to eye coordinates
-			vec3 pos = (modelViewMatrix * vPosition).xyz;
-
+			if (useNormals == true){
+				pos = (modelViewMatrix * vNormal).xyz;
+			}else{
+				pos = (modelViewMatrix * vPosition).xyz;
+			}
 			//vector from vertex position to light source
 			vec3 L = normalize(pointLightPosition.xyz - pos);
 
@@ -39,10 +45,10 @@
 			vec4 ambient = ambientProduct;
 
 			//Diffuse light
-			vec4 diffuse = vec4(0,0,0,0);//dot(L, N) * diffuseProduct;
+			vec4 diffuse = vec4(0,0,0,0); 
 
 			//Specular light
-			vec4 specular = vec4(0,0,0,0);//pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+			vec4 specular = vec4(0,0,0,0);
 
 			//light direction
 			vec3 lightDir = normalize(vec3(-0, -0, -4));

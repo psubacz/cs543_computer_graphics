@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Subacz Project 3</title>
+    <title>Subacz Project 4</title>
  
 	<script id="vshader" type="x-shader/x-vertex">
 	attribute vec4 vPosition, vNormal, vColor;
@@ -14,9 +14,14 @@
 	varying vec4 fColor;
 	uniform float vPointSize;
 	uniform float phi;
+
+
+	varying vec2 fTexCoord;
+	attribute vec2 vTexCoord;
+
 	uniform bool useLighting;
 	uniform bool useNormals;
-	
+	uniform bool useVertexTexture;
 
 	void main() {
 		gl_Position = projectionMatrix * modelViewMatrix * vPosition;	// Point position
@@ -62,18 +67,39 @@
 			fColor.a = 1.0;
 		}else{
 			fColor = vNormal;
-		} 
+		}
+		if(useVertexTexture == true){
+			fTexCoord = vTexCoord;
+		}
+		
   	}
 	</script>
 	
 	<script id="fshader" type="x-shader/x-fragment">
 	precision mediump float;
 	varying vec4 fColor;
+	varying vec2 fTexCoord;
+	uniform sampler2D texture;
+	uniform sampler2D texture0;
+	uniform sampler2D texture1;	
+	uniform sampler2D u_image2;
+	uniform sampler2D u_image3;
+	uniform sampler2D u_image4;
+	uniform sampler2D u_image5;
+	uniform sampler2D u_image6;
+	uniform sampler2D u_image7;
+
+	uniform bool useTexture;
 
 	void main() 
 	{
-		gl_FragColor = fColor;	// Point color
-  	}
+		if(useTexture == true){
+			gl_FragColor = texture2D(texture0, fTexCoord);
+		}else{
+			gl_FragColor = fColor;	// Point color
+		}
+	  }
+	  
 	</script>
 		
     <script src="lib/webgl-utils.js"></script>

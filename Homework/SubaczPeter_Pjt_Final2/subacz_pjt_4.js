@@ -104,6 +104,7 @@ var imageURLs = ['http://web.cs.wpi.edu/~jmcuneo/grass.bmp',
 				'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposx.bmp',
 				'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposy.bmp',
 				'http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposz.bmp'];
+
 var textures = [];
 var textureLoc0;
 var textureLoc1;
@@ -158,81 +159,6 @@ function main(){
 	render();
 }
 
-function configureTexture(images) {
-	// textures = [];
-	//Initialize
-	for (var ii = 0; ii < images.length; ++ii) {
-	  var texture = gl.createTexture();
-	  gl.bindTexture(gl.TEXTURE_2D, texture);
-   
-	  // Set the parameters so we can render any size image.
-	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-   
-	  // Upload the image into the texture.
-	  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, images[ii]);
-   
-	  // add the texture to the array of textures.
-	  textures.push(texture);
-	}
-}
-
-function loadImage(url,callback) {
-	var image = new Image();
-	image.crossOrigin = "";
-	image.src = url;
-	image.onload = callback
-	return image;
-  }
-
-function loadImages() {
-	images = [];
-	imagesToLoad =imageURLs.length;
-	var onImageLoad0 = function() {
-		imagesToLoad-=1;
-		images[0]=image0;
-	  };
-	var onImageLoad1 = function() {
-		imagesToLoad-=1;
-		images[1]=image1;
-	};
-	var onImageLoad2 = function() {
-		imagesToLoad-=1;
-		images[2]=image2;
-	};
-	var onImageLoad3 = function() {
-		imagesToLoad-=1;
-		images[3]=image3;
-	};
-	var onImageLoad4 = function() {
-		imagesToLoad-=1;
-		images[4]=image4;
-	};
-	var onImageLoad5 = function() {
-		imagesToLoad-=1;
-		images[5]=image5;
-	};
-	var onImageLoad6 = function() {
-		imagesToLoad-=1;
-		images[6]=image6;
-	};
-	var onImageLoad7 = function() {
-		imagesToLoad-=1;
-		images[7]=image7;
-	};
-
-	var image0 = loadImage(imageURLs[0], onImageLoad0);
-	var image1 = loadImage(imageURLs[1], onImageLoad1);
-	var image2 = loadImage(imageURLs[2], onImageLoad2);
-	var image3 = loadImage(imageURLs[3], onImageLoad3);
-	var image4 = loadImage(imageURLs[4], onImageLoad4);
-	var image5 = loadImage(imageURLs[5], onImageLoad5);
-	var image6 = loadImage(imageURLs[6], onImageLoad6);
-	var image7 = loadImage(imageURLs[7], onImageLoad7);
-
-  }
 
 function render(){
 	console.log(imagesToLoad)
@@ -383,6 +309,81 @@ function draw_background(){
 
 
 
+function configureTexture(images) {
+	// textures = [];
+	//Initialize
+	for (var ii = 0; ii < images.length; ++ii) {
+	  var texture = gl.createTexture();
+	  gl.bindTexture(gl.TEXTURE_2D, texture);
+   
+	  // Set the parameters so we can render any size image.
+	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+   
+	  // Upload the image into the texture.
+	  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, images[ii]);
+   
+	  // add the texture to the array of textures.
+	  textures.push(texture);
+	}
+}
+
+function loadImage(url,callback) {
+	var image = new Image();
+	image.crossOrigin = "";
+	image.src = url;
+	image.onload = callback
+	return image;
+  }
+
+function loadImages() {
+	images = [];
+	imagesToLoad =imageURLs.length;
+	var onImageLoad0 = function() {
+		imagesToLoad-=1;
+		images[0]=image0;
+	  };
+	var onImageLoad1 = function() {
+		imagesToLoad-=1;
+		images[1]=image1;
+	};
+	var onImageLoad2 = function() {
+		imagesToLoad-=1;
+		images[2]=image2;
+	};
+	var onImageLoad3 = function() {
+		imagesToLoad-=1;
+		images[3]=image3;
+	};
+	var onImageLoad4 = function() {
+		imagesToLoad-=1;
+		images[4]=image4;
+	};
+	var onImageLoad5 = function() {
+		imagesToLoad-=1;
+		images[5]=image5;
+	};
+	var onImageLoad6 = function() {
+		imagesToLoad-=1;
+		images[6]=image6;
+	};
+	var onImageLoad7 = function() {
+		imagesToLoad-=1;
+		images[7]=image7;
+	};
+
+	var image0 = loadImage(imageURLs[0], onImageLoad0);
+	var image1 = loadImage(imageURLs[1], onImageLoad1);
+	var image2 = loadImage(imageURLs[2], onImageLoad2);
+	var image3 = loadImage(imageURLs[3], onImageLoad3);
+	var image4 = loadImage(imageURLs[4], onImageLoad4);
+	var image5 = loadImage(imageURLs[5], onImageLoad5);
+	var image6 = loadImage(imageURLs[6], onImageLoad6);
+	var image7 = loadImage(imageURLs[7], onImageLoad7);
+  }
+
 function process_keypress(theKey){
 	// function to toggle modes,
 	var outputMessage = '';
@@ -468,12 +469,18 @@ function update_state_output(){
 	}else{
 		msg += " Flat Shading: Off<br>";
 	}
-
-	if (viewTextures == true){
-		msg += " Textures: On<br>";
+	if(imagesToLoad>0){
+		msg += " Textures: Not Ready, Please wait...<br>";
+	}else if (imagesToLoad = 0){
+		msg += " Textures: Please wait, configuring textures...<br>";
 	}else{
-		msg += " Textures: Off<br>";
+		if (viewTextures == true){
+			msg += " Textures: On<br>";
+		}else{
+			msg += " Textures: Off<br>";
+		}
 	}
+
 	msg += " Spotlight Angle:"+phi+"<br>";
 	msg += " Model Angle:"+beta+"<br>";
 	document.getElementById("pageMode").innerHTML = msg;

@@ -5,74 +5,74 @@
     <title>Subacz Project 4</title>
  
 	<script id="vshader" type="x-shader/x-vertex">
-	attribute vec4 vPosition, vNormal, vColor;
-	uniform mat4 projectionMatrix;
-	uniform mat4 modelViewMatrix;
-	uniform vec4 ambientProduct, diffuseProduct, specularProduct;
-	uniform float shininess;
-	uniform vec4 pointLightPosition;
-	varying vec4 fColor;
-	uniform float vPointSize;
-	uniform float phi;
+		attribute vec4 vPosition, vNormal, vColor;
+		uniform mat4 projectionMatrix;
+		uniform mat4 modelViewMatrix;
+		uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+		uniform float shininess;
+		uniform vec4 pointLightPosition;
+		varying vec4 fColor;
+		uniform float vPointSize;
+		uniform float phi;
 
 
-	varying vec2 fTexCoord;
-	attribute vec2 vTexCoord;
+		varying vec2 fTexCoord;
+		attribute vec2 vTexCoord;
 
-	uniform bool useLighting;
-	uniform bool useNormals;
-	uniform bool useVertexTexture;
+		uniform bool useLighting;
+		uniform bool useNormals;
+		uniform bool useVertexTexture;
 
-	void main() {
-		gl_Position = projectionMatrix * modelViewMatrix * vPosition;	// Point position
-		gl_PointSize = vPointSize;		// Point size
-		vec3 pos;
-		if (useLighting == true){
-			// Convert model to eye coordinates
-			if (useNormals == true){
-				pos = (modelViewMatrix * vNormal).xyz;
-			}else{
-				pos = (modelViewMatrix * vPosition).xyz;
-			}
-			//vector from vertex position to light source
-			vec3 L = normalize(pointLightPosition.xyz - pos);
+		void main() {
+			gl_Position = projectionMatrix * modelViewMatrix * vPosition;	// Point position
+			gl_PointSize = vPointSize;		// Point size
+			vec3 pos;
+			if (useLighting == true){
+				// Convert model to eye coordinates
+				if (useNormals == true){
+					pos = (modelViewMatrix * vNormal).xyz;
+				}else{
+					pos = (modelViewMatrix * vPosition).xyz;
+				}
+				//vector from vertex position to light source
+				vec3 L = normalize(pointLightPosition.xyz - pos);
 
-			//view vector
-			vec3 V = normalize(-pos);
+				//view vector
+				vec3 V = normalize(-pos);
 
-			//Surface normal at that vertex
-			vec3 N = normalize(modelViewMatrix * vNormal).xyz;
+				//Surface normal at that vertex
+				vec3 N = normalize(modelViewMatrix * vNormal).xyz;
 
-			//Reflection vector
-			vec3 R = (2.0 * dot(L, N) * N) - L;
+				//Reflection vector
+				vec3 R = (2.0 * dot(L, N) * N) - L;
 
-			//Ambient light
-			vec4 ambient = ambientProduct;
+				//Ambient light
+				vec4 ambient = ambientProduct;
 
-			//Diffuse light
-			vec4 diffuse = vec4(0,0,0,0); 
+				//Diffuse light
+				vec4 diffuse =  dot(L, N) * diffuseProduct; //vec4(0,0,0,0); 
 
-			//Specular light
-			vec4 specular = vec4(0,0,0,0);
+				//Specular light
+				vec4 specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;// vec4(0,0,0,0);
 
-			//light direction
-			vec3 lightDir = normalize(vec3(-0, -0, -4));
+				//light direction
+				vec3 lightDir = normalize(vec3(-0, -0, -4));
 
-			if(dot(L, -lightDir) > phi)
-			{
-				diffuse = dot(L, N) * diffuseProduct;
-				specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
-			}
-			fColor = ambient + diffuse + specular;
+				//if(dot(L, -lightDir) > phi)
+				//{
+				//	diffuse = dot(L, N) * diffuseProduct;
+				//		specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+				//}
+				fColor = ambient + diffuse + specular;
 			fColor.a = 1.0;
-		}else{
-			fColor = vNormal;
+			}else{
+				fColor = vNormal;
+			}
+			if(useVertexTexture == true){
+				fTexCoord = vTexCoord;
+			}
+			
 		}
-		if(useVertexTexture == true){
-			fTexCoord = vTexCoord;
-		}
-		
-  	}
 	</script>
 	
 	<script id="fshader" type="x-shader/x-fragment">

@@ -53,14 +53,14 @@ var theCube = cube();
 var numTimesToSubdivide = 5;
 var gouraudLightingnormalsArraySphere = [];
 var flatShadingNormalsArraySphere = [];
-var pointsArray = [];
+var theSphere = [];
 var va = vec4(0.0, 0.0, -1.0,1);
 var vb = vec4(0.0, 0.942809, 0.333333, 1);
 var vc = vec4(-0.816497, -0.471405, 0.333333, 1);
 var vd = vec4(0.816497, -0.471405, 0.333333,1);
 
 //tree size
-var numberOfBranches = 3;		//number of subtrees within 
+var numberOfBranches = 2;		//number of subtrees within 
 var treeDisplacementX = 2.5;	//tree x displacement
 var treeDisplacementY = 3;		//tree y displacement
 var treeDisplacementZ = 0;		//tree z displacement
@@ -84,6 +84,9 @@ var animation = true;
 var gouraudLighting = false;
 var flatShading = false;
 var viewTextures = false;
+var useShadows = true;
+var useReflection = false;
+var useRefraction = false;
 
 // materials list and index
 var index = 0;
@@ -94,7 +97,7 @@ var materialShininessList = [];
 
 //walls and floor
 var thePlane;
-var planeScale = 30;
+var planeScale = 50;
 var imagesToLoad;
 var imageURLs = ['http://web.cs.wpi.edu/~jmcuneo/grass.bmp',
 				'http://web.cs.wpi.edu/~jmcuneo/stones.bmp',
@@ -109,11 +112,21 @@ var textures = [];
 var textureLoc0;
 var textureLoc1;
 var texCoordsArray = [];
-var minT = 0.0;
-var maxT = 1.0;
-//Texture coordinates at the corners of a quadrilateral
 var images;
 var numberOfTextures = 0;
+
+//Shadows
+var light = vec3(0.0, 0.0, 2.0);
+var m = mat4();
+var shadowColor = vec4(0.1,0.1,0.1,0.95)
+var shadowSphereColorArray =[];
+var shadowCubeColorArray =[];
+var shadowLinesColorArray = []
+var shadowScale = 1.5
+
+//Enviromental map Reflection/refraction
+var cubeMap;
+
 
 function main(){
 	window.onkeypress = function (event) {		 	//when a key is pressed, process the input
@@ -131,7 +144,7 @@ function main(){
 	gl.useProgram(program);							// Tell welgl which program to use
 	gl.viewport( 0, 0, canvas.width, canvas.height);//Set up the viewport
 	aspect =  canvas.width/canvas.height;			//calculate the apsect ratio
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);				// Set clear color
+	gl.clearColor(1.0, 1.0, 1.0, 1.0);				// Set clear color
 	gl.enable(gl.DEPTH_TEST);						//enable depth testing
 	gl.enable(gl.CULL_FACE);						//enable culling - default backfacing triangles
 	gl.cullFace(gl.BACK);							//make sure we are backculling
@@ -141,163 +154,162 @@ function main(){
 	modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
 	projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix");
 
-	projectionMatrix = perspective(fovy, aspect, 0.001, 50);
+	projectionMatrix = perspective(fovy, aspect, 0.001, 60);
 	gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix));
 
-	eye = vec3(0, -5, -20);
-	at = vec3(0.0, -5, 0.0);
+	eye = vec3(0, 10, -30);
+	at = vec3(0.0, 10, 0.0);
 	up = vec3(0.0, 1.0, 0.0);
 	mvMatrix = lookAt(eye, at , up);
 	modelViewMatrix = mvMatrix; 
-	process_keypress('m');
-
-	// var images = loadImages(imageURLs)	//load the images
+	//load the images
 	loadImages()
-
 	thePlane = plane();
 
+	//set shadows
+	light = eye;
+	m[3][3] = 0;
+	m[3][2] = -1/light[2];
+	
+	for(var i =0;i<theCube.length;i++){
+		shadowCubeColorArray.push(shadowColor);
+	}
+	for(var i =0;i<theSphere.length;i++){
+		shadowSphereColorArray.push(shadowColor);
+	}
+	for(var i = 0; i<8;i++){
+		shadowLinesColorArray.push(shadowColor);
+	}
+
+	process_keypress('m');
 	render();
 }
 
-
 function render(){
-	console.log(imagesToLoad)
-	if(imagesToLoad ==0){					// if all the files are downloaded,
-		configureTexture(images)			//	configure the images
-		imagesToLoad-=1;					//	make sure textures configuration is not repeated
-		viewTextures = true;				//	make the textures viewable
-	}
-	index = 0;
-	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
-	gl.uniform1f(gl.getUniformLocation(program, "phi"), phi);	//set spotlight angle
-	
-	computeHierarchyModel();	//compute hierachy model
-
-	draw_background(); 			//draw floor and wall planes
-
-	mvMatrix = modelViewMatrix; 
 	update_state_output()
+	stack.push(mvMatrix);
+		if(imagesToLoad == 0){					// if all the files are downloaded,
+			configureTexture(images)			//	configure the images
+			imagesToLoad-=1;					//	make sure textures configuration is not repeated
+			viewTextures = true;				//	make the textures viewable
+		}
+		index = 0;
+		gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
+		gl.uniform1f(gl.getUniformLocation(program, "phi"), phi);	//set spotlight angle
+		computeHierarchyModel();	//compute hierachy model
+		draw_background(); 			//draw floor and wall planes
+
+	mvMatrix = stack.pop();
+
 	
 	if (animation){ 			//recursive animation 
 		id = requestAnimationFrame(render);
 	}
 }
 
-function drawPlane(color,type){
-
+function draw_shadows(type){
 	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
-	gl.uniform1f(gl.getUniformLocation(program, "useTexture"), viewTextures);
-	gl.uniform1f(gl.getUniformLocation(program, "useVertexTexture"), true);
 
-	var cColor = [];
-	for(i = 0; i<thePlane.length;i++){
-		cColor.push(color);
-	};
-	
-	var pBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(thePlane), gl.STATIC_DRAW);
-
-	var vPosition = gl.getAttribLocation(program,  "vPosition");
-	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
-	
-	var nBuffer = gl.createBuffer();
-	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
-	gl.bufferData( gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW );
-
-	var vNormal = gl.getAttribLocation( program, "vNormal" );
-	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
-	gl.enableVertexAttribArray( vNormal)
-
-
-	if(type == 'floor'){
-		gl.uniform1i(gl.getUniformLocation(program, "texture0"), textures[0]);
-		// Set each texture unit to use a particular texture.
-		gl.activeTexture(gl.TEXTURE0);
-		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-	}else if (type == 'wall'){
-		gl.uniform1i(gl.getUniformLocation(program, "texture0"), textures[1]);
-		// Set each texture unit to use a particular texture.
-		gl.activeTexture(gl.TEXTURE0);
-		gl.bindTexture(gl.TEXTURE_2D, textures[1]);
-	}
-	
-	var tBuffer = gl.createBuffer();
-    gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer );
-	gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW );
-
-    var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
-    gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
-	gl.enableVertexAttribArray( vTexCoord );
-	
-
-	gl.drawArrays(gl.TRIANGLES, 0,thePlane.length);
-	gl.deleteBuffer(pBuffer);
-	gl.deleteBuffer(nBuffer);
-}
-
-function plane(){
-	var verts = [];
-	verts = verts.concat(quad(  4, 5, 6, 7 ));
-	//compute normals
-	var i = 0;
-	while(i<verts.length){
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-
-		var vc  = normal_newell_method([verts[i],verts[i+1],verts[i+2],verts[i]]);
-		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
-		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
-		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
-		i+=3;
-	}
-	i = 0;
-	while(i<pointsArray.length){
-		texCoordsArray.push(-3,  4,);
-		texCoordsArray.push(-3, -1);
-		texCoordsArray.push( 2, -1);
-		texCoordsArray.push(-3,  4);
-		texCoordsArray.push( 2, -1,);
-		texCoordsArray.push( 2,  4,);
-		i+=6;
-	}
-
-	return verts;
-}
-
-function draw_background(){
 	stack.push(mvMatrix);
-		mvMatrix = mult(mvMatrix, rotateY(beta));
-		mvMatrix = mult(mvMatrix, rotateX(90));
-		mvMatrix = mult(mvMatrix, rotateZ(45));
-		mvMatrix = mult(mvMatrix, translate(0, 0, 30));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
-		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
-		drawPlane(vec4(0.5,0.5,0.5,1),'floor');
+
+		// if (stack.length>2){
+		// 	mvMatrix=stack[2]
+		// }else{
+		// 	mvMatrix=stack[0]
+		// }
+		
+		// mvMatrix = mult(mvMatrix, translate(10, -2, 1));
+		// m[3][0] = Math.cos(deg2rad(beta));
+		// mvMatrix = mult(mvMatrix, rotateY(beta));
+		mvMatrix = mult(mvMatrix, translate(light[0], light[1], light[2]));
+		// mvMatrix = mult(mvMatrix, m);
+		mvMatrix = mult(mvMatrix, translate(-light[0], -light[1], -light[2]));
+
+		// zero out the model view matrix and project the shadows to the back
+		mvMatrix[2][3]=0;
+		mvMatrix = mult(translate(Math.sin(deg2rad(beta)), 0, -50),mvMatrix)
+
+		mvMatrix = mult(mvMatrix, scalem(shadowScale,shadowScale,shadowScale));
+		if(type == "sphere"){
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
+
+			var pBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten(theSphere), gl.STATIC_DRAW);
+		
+			var vPosition = gl.getAttribLocation(program,  "vPosition");
+			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
+			
+			var nBuffer = gl.createBuffer();
+			gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
+			gl.bufferData( gl.ARRAY_BUFFER, flatten(shadowSphereColorArray), gl.STATIC_DRAW );
+		
+			var vNormal = gl.getAttribLocation( program, "vNormal" );
+			gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
+			gl.enableVertexAttribArray( vNormal)
+		
+			gl.drawArrays(gl.TRIANGLES, 0,theSphere.length);
+			gl.deleteBuffer(pBuffer);
+			gl.deleteBuffer(nBuffer);
+		}else if (type == "cube"){
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
+
+			var pBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten(theCube), gl.STATIC_DRAW);
+		
+			var vPosition = gl.getAttribLocation(program,  "vPosition");
+			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
+			
+			var nBuffer = gl.createBuffer();
+			gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
+			gl.bufferData( gl.ARRAY_BUFFER, flatten(shadowCubeColorArray), gl.STATIC_DRAW );
+		
+			var vNormal = gl.getAttribLocation( program, "vNormal" );
+			gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
+			gl.enableVertexAttribArray( vNormal)
+		
+			gl.drawArrays(gl.TRIANGLES, 0,theCube.length);
+			gl.deleteBuffer(pBuffer);
+			gl.deleteBuffer(nBuffer);
+		}else if(type = "lines"){
+
+			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
+
+			var connectionLinesPointsArray = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
+				vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
+				vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.5, 0, 1),	//right verticle line
+				vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.5, 0, 1)];	//left verticle line
+
+			var pBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, flatten(connectionLinesPointsArray), gl.STATIC_DRAW);
+		
+			var vPosition = gl.getAttribLocation(program,  "vPosition");
+			gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
+			
+			var nBuffer = gl.createBuffer();
+			gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
+			gl.bufferData( gl.ARRAY_BUFFER, flatten(shadowLinesColorArray), gl.STATIC_DRAW );
+		
+			var vNormal = gl.getAttribLocation( program, "vNormal" );
+			gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
+			gl.enableVertexAttribArray( vNormal)
+		
+			gl.drawArrays(gl.LINES, 0,connectionLinesPointsArray.length);
+			gl.deleteBuffer(pBuffer);
+			gl.deleteBuffer(nBuffer);
+		}
+		
 	mvMatrix = stack.pop();
-	stack.push(mvMatrix);
-		mvMatrix = mult(mvMatrix, rotateY(beta+45));
-		mvMatrix = mult(mvMatrix, rotateX(0));
-		mvMatrix = mult(mvMatrix, translate(0, 0, 25));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
-		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
-		drawPlane(vec4(0,0,0.75,1),'wall');
-	mvMatrix = stack.pop();
-	
-	stack.push(mvMatrix);
-		mvMatrix = mult(mvMatrix, rotateY(beta-45));
-		mvMatrix = mult(mvMatrix, rotateX(0));
-		mvMatrix = mult(mvMatrix, translate(0, 0, 25));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
-		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
-		drawPlane(vec4(0,0,0.75,1),'wall');
-	mvMatrix = stack.pop();	
 }
 
-
-
+function deg2rad(deg){
+	return deg*(Math.PI/180);
+}
 
 
 
@@ -420,20 +432,57 @@ function process_keypress(theKey){
 			break;
 		case 'B':
 		case 'b':
-			// flat shading 
+			// toggle textures on and off 
 			if (viewTextures == false){
 				viewTextures = true;
 			}else{
 				viewTextures = false;
 			}
 			break;
+		case 'A':
+		case 'a':
+			// toggle shadows on and off
+			if (useShadows == false){
+				useShadows = true;
+			}else{
+				useShadows = false;
+			}
+			break;
+			
 		case 'n':
 			generateMaterialLighting();
 			break;
 		case 'w':
 			phi = 0.99;
 			break;
+		case 'C':
+		case 'c':
+			// toggle reflections on and off 
+			if (useReflection == false){
+				useReflection = true;
+			}else{
+				useReflection = false;
+			}
+			break;
+		case 'D':
+		case 'd':
+			// toggle refractions on and off 
+			if (useRefraction == false){
+				useRefraction = true;
+			}else{
+				useRefraction = false;
+			}
+			break;
 
+		case 'z':
+			if (animation == false){
+				animation = true;
+				render();
+			}else{
+				animation = false;
+				render();
+			}
+			break;
 		default:		
 	}
 	outputMessage = 'Current keypress actions are: <br>';
@@ -470,7 +519,8 @@ function update_state_output(){
 		msg += " Flat Shading: Off<br>";
 	}
 	if(imagesToLoad>0){
-		msg += " Textures: Not Ready, Please wait...<br>";
+		console.log(numberOfTextures)
+		msg += " Textures: Not Ready, waiting on "+numberOfTextures+" <br>";
 	}else if (imagesToLoad = 0){
 		msg += " Textures: Please wait, configuring textures...<br>";
 	}else{
@@ -480,7 +530,21 @@ function update_state_output(){
 			msg += " Textures: Off<br>";
 		}
 	}
-
+	if (useShadows == true){
+		msg += " Shadows: On<br>";
+	}else{
+		msg += " Shadows: Off<br>";
+	}
+	if (useReflection == true){
+		msg += " Reflection: On<br>";
+	}else{
+		msg += " Reflection: Off<br>";
+	}
+	if (useRefraction == true){
+		msg += " Refraction: On<br>";
+	}else{
+		msg += " Refraction: Off<br>";
+	}
 	msg += " Spotlight Angle:"+phi+"<br>";
 	msg += " Model Angle:"+beta+"<br>";
 	document.getElementById("pageMode").innerHTML = msg;
@@ -537,6 +601,10 @@ function draw_cube(){
 	//delete the buffer for memory management
 	gl.deleteBuffer(pBuffer);
 	gl.deleteBuffer(nBuffer);
+
+	if(useShadows==true){
+		draw_shadows('cube');
+	}
 }
 
 function draw_sphere(){
@@ -579,15 +647,19 @@ function draw_sphere(){
 
 	var vBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(pointsArray), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(theSphere), gl.STATIC_DRAW);
 
 	var vPosition = gl.getAttribLocation( program, "vPosition");
  	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vPosition);
 
-	gl.drawArrays( gl.TRIANGLES, 0, pointsArray.length );
+	gl.drawArrays( gl.TRIANGLES, 0, theSphere.length );
 	gl.deleteBuffer(vBuffer);
 	gl.deleteBuffer(nBuffer);
+	
+	if(useShadows==true){
+		draw_shadows('sphere');
+	}
 }
 
 function draw_lines(){
@@ -595,19 +667,21 @@ function draw_lines(){
 	gl.uniform1f(gl.getUniformLocation(program, "useTexture"), false);
 	gl.uniform1f(gl.getUniformLocation(program, "useVertexTexture"), false);
 
-	var cCenter = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
+	gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
+
+	var connectionLinesPointsArray = [vec4( 0, -0.6, 0, 1),vec4( 0, -1.5, 0, 1),		//verticle line
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
 					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.5, 0, 1),	//right verticle line
 					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.5, 0, 1)];	//left verticle line
 
-	var cColor = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
+	var connectionLinesColorsArray = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
 		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//horzontal line
 		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//right verticle line
 		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];				//left verticle line
 	
 	var pBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, flatten(cCenter), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(connectionLinesPointsArray), gl.STATIC_DRAW);
 
 	var vPosition = gl.getAttribLocation(program,  "vPosition");
 	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
@@ -615,7 +689,7 @@ function draw_lines(){
 	
 	var nBuffer = gl.createBuffer();
 	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
-	gl.bufferData( gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW );
+	gl.bufferData( gl.ARRAY_BUFFER, flatten(connectionLinesColorsArray), gl.STATIC_DRAW );
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
 	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
@@ -624,6 +698,9 @@ function draw_lines(){
 	gl.drawArrays(gl.LINES, 0,8);
 	gl.deleteBuffer(pBuffer);
 	gl.deleteBuffer(nBuffer);
+	// if(useShadows){
+	// 	draw_shadows("lines")
+	// }
 }
 
 function cube(){
@@ -678,9 +755,9 @@ function quad(a, b, c, d)
 }
 
 function triangle(a, b, c){
-	pointsArray.push(a);
-	pointsArray.push(b);
-	pointsArray.push(c);
+	theSphere.push(a);
+	theSphere.push(b);
+	theSphere.push(c);
 
 	// normals are vectors
 	flatShadingNormalsArraySphere.push(vec4(-a[0],-b[1], -c[2], 0.0));
@@ -772,14 +849,16 @@ function computeHierarchyModel(){
 			step 1
 		3. Repeat steps 1 & 2 for each level.
 	*/
-	
-	modelRotations(1); // Increment rotation angle
-	mvMatrix = mult(mvMatrix,rotateY(-beta));					// Rotations 
-	gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));	// 
-	draw_sphere();	// draw the root sphere
-	treeDisplacementX = 10;										// reset tree displacement
-	attach_subtrees(numberOfBranches);	
-			
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, translate(0, 10, -5));
+		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));	// 
+		draw_sphere();	// draw the root sphere
+
+		modelRotations(1); // Increment rotation angle
+		mvMatrix = mult(mvMatrix,rotateY(-beta));					// Rotations 
+		treeDisplacementX = 10;										// reset tree displacement
+		attach_subtrees(numberOfBranches);	
+	mvMatrix = stack.pop();	
 }
 
 function attach_subtrees(numberOfBranches){
@@ -853,7 +932,7 @@ function generateMaterialLighting(){
 
 function modelRotations(direction){
 	// incrementes beta by 0.5 degrees. If beta reaches 360 degree, reset to 0
-	beta +=0.5*direction;
+	beta +=1*direction;
 	if (beta%360==0){
 		beta = 0;
 	}
@@ -867,4 +946,131 @@ function setSpotlightAngle(dPhi){
 	}else if (phi%0.944==0){
 		phi = 0.945;
 	}
+}
+
+function drawPlane(color,type){
+
+	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
+	gl.uniform1f(gl.getUniformLocation(program, "useTexture"), viewTextures);
+	gl.uniform1f(gl.getUniformLocation(program, "useVertexTexture"), true);
+
+	var cColor = [];
+	for(i = 0; i<thePlane.length;i++){
+		cColor.push(color);
+	};
+	
+	var pBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, flatten(thePlane), gl.STATIC_DRAW);
+
+	var vPosition = gl.getAttribLocation(program,  "vPosition");
+	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
+	
+	var nBuffer = gl.createBuffer();
+	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
+	gl.bufferData( gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW );
+
+	var vNormal = gl.getAttribLocation( program, "vNormal" );
+	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
+	gl.enableVertexAttribArray( vNormal)
+
+
+	if(type == 'floor'){
+		gl.uniform1i(gl.getUniformLocation(program, "texture0"), textures[0]);
+		// Set each texture unit to use a particular texture.
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+	}else if (type == 'wall'){
+		gl.uniform1i(gl.getUniformLocation(program, "texture0"), textures[1]);
+		// Set each texture unit to use a particular texture.
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, textures[1]);
+	}
+	
+	var tBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer );
+	gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW );
+
+    var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
+    gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
+	gl.enableVertexAttribArray( vTexCoord );
+
+	gl.drawArrays(gl.TRIANGLES, 0,thePlane.length);
+	gl.deleteBuffer(pBuffer);
+	gl.deleteBuffer(nBuffer);
+	gl.disableVertexAttribArray( vTexCoord );
+	gl.deleteBuffer(tBuffer);
+}
+
+function plane(){
+	var verts = [];
+	verts = verts.concat(quad(  4, 5, 6, 7 ));
+	//compute normals
+	var i = 0;
+	while(i<verts.length){
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
+
+		var vc  = normal_newell_method([verts[i],verts[i+1],verts[i+2],verts[i]]);
+		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
+		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
+		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
+		i+=3;
+	}
+	i = 0;
+	while(i<theSphere.length){
+		texCoordsArray.push(-3,  4,);
+		texCoordsArray.push(-3, -1);
+		texCoordsArray.push( 2, -1);
+		texCoordsArray.push(-3,  4);
+		texCoordsArray.push( 2, -1,);
+		texCoordsArray.push( 2,  4,);
+		i+=6;
+	}
+
+	return verts;
+}
+
+function draw_background(){
+	//draw the floor
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateX(90));
+		mvMatrix = mult(mvMatrix, rotateZ(0));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 30));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(0.5,0.5,0.5,1),'floor');
+	mvMatrix = stack.pop();
+
+	// // draw the wall on the left
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateY(90));
+		mvMatrix = mult(mvMatrix, rotateX(0));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 50));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(0,0,0.75,1),'wall');
+	mvMatrix = stack.pop();
+
+	// draw the wall on the left
+	stack.push(mvMatrix);
+		// mvMatrix = mult(mvMatrix, rotateY(beta));
+		mvMatrix = mult(mvMatrix, rotateX(0));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 50));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(0,0,0.75,1),'wall');
+	mvMatrix = stack.pop();
+
+	// //draw the wall on the left
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateY(-90));
+		mvMatrix = mult(mvMatrix, rotateX(0));
+		mvMatrix = mult(mvMatrix, translate(0, 0, 50));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)),scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix) );
+		drawPlane(vec4(0,0,0.75,1),'wall');
+	mvMatrix = stack.pop();	
 }

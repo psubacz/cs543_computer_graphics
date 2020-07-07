@@ -23,6 +23,9 @@
 		uniform bool useNormals;
 		uniform bool useVertexTexture;
 
+		varying vec3 refl;
+		varying vec3 refr;
+
 		void main() {
 			gl_Position = projectionMatrix * modelViewMatrix * vPosition;	// Point position
 			gl_PointSize = vPointSize;		// Point size
@@ -43,6 +46,12 @@
 				//Surface normal at that vertex
 				vec3 N = normalize(modelViewMatrix * vNormal).xyz;
 
+				//Environment map reflection
+				refl = reflect(pos, N);
+
+				//Environment map refraction
+				refr = refract(pos, N, 0.80);
+
 				//Reflection vector
 				vec3 R = (2.0 * dot(L, N) * N) - L;
 
@@ -58,11 +67,6 @@
 				//light direction
 				vec3 lightDir = normalize(vec3(-0, -0, -4));
 
-				//if(dot(L, -lightDir) > phi)
-				//{
-				//	diffuse = dot(L, N) * diffuseProduct;
-				//		specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
-				//}
 				fColor = ambient + diffuse + specular;
 			fColor.a = 1.0;
 			}else{
@@ -71,37 +75,42 @@
 			if(useVertexTexture == true){
 				fTexCoord = vTexCoord;
 			}
-			
 		}
 	</script>
 	
 	<script id="fshader" type="x-shader/x-fragment">
-	precision mediump float;
-	varying vec4 fColor;
-	varying vec2 fTexCoord;
-	uniform sampler2D texture;
-	uniform sampler2D texture0;
-	uniform sampler2D texture1;	
-	uniform sampler2D u_image2;
-	uniform sampler2D u_image3;
-	uniform sampler2D u_image4;
-	uniform sampler2D u_image5;
-	uniform sampler2D u_image6;
-	uniform sampler2D u_image7;
+		precision mediump float;
+		varying vec4 fColor;
 
-	uniform bool useTexture;
+		varying vec2 fTexCoord;
+		uniform bool useTexture;
+		uniform sampler2D texture0;
 
-	void main() 
-	{
-		if(useTexture == true){
-			gl_FragColor = texture2D(texture0, fTexCoord);
-		}else{
-			gl_FragColor = fColor;	// Point color
-		}
-	  }
-	  
-	</script>
+		uniform samplerCube textureMap;
+
+		uniform bool useReflection;
+		uniform bool useRefraction;
 		
+		varying vec3 refl;
+		varying vec3 refr;
+		
+		void main() 
+		{
+			if(useTexture == true){
+				gl_FragColor = texture2D(texture0, fTexCoord);
+			}else{
+				gl_FragColor = fColor;	// Point color
+				if (useRefraction == true && useReflection == true){
+					gl_FragColor += textureCube(textureMap, refr) + textureCube(textureMap, refl);
+				}else if (useRefraction == true){
+					gl_FragColor += textureCube(textureMap, refr);
+				}else if ( useReflection == true){
+					gl_FragColor += textureCube(textureMap, refl);
+				}
+			}
+		} 
+	</script>
+
     <script src="lib/webgl-utils.js"></script>
     <script src="lib/initShaders.js"></script>
     <script src="lib/MV.js"></script>

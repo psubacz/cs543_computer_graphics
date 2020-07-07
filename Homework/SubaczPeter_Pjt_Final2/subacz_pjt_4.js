@@ -67,6 +67,12 @@ var treeDisplacementZ = 0;		//tree z displacement
 var treeLineDecay = 1.5;		//line decay per recusive tree
 var numberOfObjects = 0;		//number of objects on the tree
 
+//lines
+var connectionLinesColorsArray = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
+	vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//horzontal line
+	vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//right verticle line
+	vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];				//left verticle line
+
 //point lighting location
 var pointLightPosition = vec4(0.0, 0.0, 5.0, 0.0 );
 var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
@@ -115,6 +121,7 @@ var textureLoc1;
 var texCoordsArray = [];
 var images;
 var numberOfTextures = 0;
+var wallDisplacementZ = 50
 
 //Shadows
 var light = vec3(0.0, 0.0, 2.0);
@@ -127,12 +134,6 @@ var shadowScale = 1.5
 
 //Enviromental map Reflection/refraction
 var cubeMap;
-var red = new Uint8Array([255, 0, 0, 255]);
-var blue = new Uint8Array([0, 0, 255, 255]);
-var green = new Uint8Array([0, 255, 0, 255]);
-var cyan = new Uint8Array([0, 255, 255, 255]);
-var magenta = new Uint8Array([255, 0, 255, 255]);
-var yellow = new Uint8Array([255, 255, 0, 255]);
 
 function main(){
 	window.onkeypress = function (event) {		 	//when a key is pressed, process the input
@@ -164,10 +165,11 @@ function main(){
 	gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix));
 
 	eye = vec3(0, 10, -25);
-	at = vec3(0.0, 10, 0.0);
+	at = vec3(0.0, 6.0, 0.0);
 	up = vec3(0.0, 1.0, 0.0);
 	mvMatrix = lookAt(eye, at , up);
-	modelViewMatrix = mvMatrix; 
+	modelViewMatrix = mvMatrix;
+
 	//load the images
 	loadImages()
 	thePlane = plane();
@@ -175,7 +177,7 @@ function main(){
 	//set shadows
 	light = eye;
 	m[3][3] = 0;
-	m[3][2] = -1/light[2];
+	m[3][2] = 1/light[2];
 	
 	for(var i =0;i<theCube.length;i++){
 		shadowCubeColorArray.push(shadowColor);
@@ -192,16 +194,18 @@ function main(){
 }
 
 function render(){
+	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
 	update_state_output()
 	stack.push(mvMatrix);
 		if(imagesToLoad == 0 && texturesLoaded == false){	// if all the files are downloaded,
 			configureTexture(images)						// configure the images
 			texturesLoaded = true;
+			viewTextures = true;
 		}
-		index = 0;
-		gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
-		computeHierarchyModel();	//compute hierachy model
 		draw_background(); 			//draw floor and wall planes
+		index = 0;
+		computeHierarchyModel();	//compute hierachy model
+		// draw_background(); 			//draw floor and wall planes
 	mvMatrix = stack.pop();
 	if (animation){
 		id = requestAnimationFrame(render);
@@ -209,19 +213,22 @@ function render(){
 }
 
 function draw_shadows(type){
+	//shadows projections
 	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
 	gl.uniform1f(gl.getUniformLocation(program, "useReflection"), false);
 	gl.uniform1f(gl.getUniformLocation(program, "useRefraction"), false);
 
 	stack.push(mvMatrix);
-		mvMatrix = mult(mvMatrix, translate(light[0], light[1], light[2]));
-		// mvMatrix = mult(mvMatrix, m);
-		mvMatrix = mult(mvMatrix, translate(-light[0], -light[1], -light[2]));
-		// zero out the model view matrix and project the shadows to the back
-		mvMatrix[2][3]=0;
-		mvMatrix = mult(translate(Math.sin(deg2rad(beta)), 0, -40),mvMatrix)
-		// scale 
-		mvMatrix = mult(mvMatrix, scalem(shadowScale,shadowScale,shadowScale));
+		var shadowMatrix = mat4();
+		shadowMatrix = mult(translate(light[0], light[1], light[2]),shadowMatrix);
+		shadowMatrix = mult(m,shadowMatrix);
+		shadowMatrix = mult(shadowMatrix,translate(-light[0], -light[1], -light[2]));
+		mvMatrix = mult(shadowMatrix,mvMatrix);
+		//translate to the wall and adjusted for z displacement
+		// mvMatrix[2][3] =0
+		// mvMatrix = mult(translate(0, 0, -20+(mvMatrix[2][3]-20)),mvMatrix)
+		console.log(mvMatrix[2][3])
+		
 		if(type == "sphere"){
 			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
 
@@ -302,24 +309,23 @@ function configureTexture(images) {
 	gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
 	//Create a 2x2 texture
-	gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA,
-		1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, red);
 	gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA,
-		1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, blue);
-	gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA,
-		1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, green);
-	gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA,
-		1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, yellow);
-	gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA,
-		1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, cyan);
-	gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA,
-		1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, magenta);
+		gl.RGBA, gl.UNSIGNED_BYTE, images[2]);
+	gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, 
+		gl.RGBA, gl.UNSIGNED_BYTE, images[3]);
+	gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, 
+		gl.RGBA, gl.UNSIGNED_BYTE, images[4]);
+	gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, 
+		gl.RGBA, gl.UNSIGNED_BYTE, images[5]);
+	gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, 
+		gl.RGBA, gl.UNSIGNED_BYTE, images[6]);
+	gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, 
+		gl.RGBA, gl.UNSIGNED_BYTE, images[7]);
 
 	gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	
-	gl.uniform1i(gl.getUniformLocation(program, "textureMap"), 1);
 
+	gl.uniform1i(gl.getUniformLocation(program, "textureMap"), 1);
 }
 
 function loadImage(url,callback){
@@ -379,7 +385,6 @@ function loadImages(){
 function process_keypress(theKey){
 	// function to toggle modes,
 	var outputMessage = '';
-
 	//on key presses, do change the colors or modes
 	switch (theKey) {
 		case 'm':
@@ -424,7 +429,14 @@ function process_keypress(theKey){
 			generateMaterialLighting();
 			break;
 		case 'w':
-			phi = 0.99;
+			animation = true;
+			gouraudLighting = true;
+			flatShading = false;
+			viewTextures = true;
+			useShadows = true;
+			useReflection = false;
+			useRefraction = false;
+			beta =0;
 			break;
 		case 'C':
 		case 'c':
@@ -447,15 +459,17 @@ function process_keypress(theKey){
 		case 'z':
 			if (animation == false){
 				animation = true;
-				render();
+				
 			}else{
 				animation = false;
-				render();
 			}
+			render();
 			break;
 		default:
 			//do nothing		
 	}
+
+
 	outputMessage = 'Current keypress actions are: <br>';
 	outputMessage += '- Interaction: <br>';
 	outputMessage += "-- Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading).<br>";
@@ -463,7 +477,6 @@ function process_keypress(theKey){
 	outputMessage += "-- Press ' n ' - Change the color properties. <br>";
 	outputMessage += "-- Press ' c ' - To toggle refections. <br>";
 	outputMessage += "-- Press ' d ' - To toggle refractions. <br>";
-	outputMessage += "-- Press ' z ' - To toggle animation. <br>";
 	outputMessage += "-- Press ' z ' - To toggle animation. <br>";
 	outputMessage += "-- Press ' a ' - To toggle shadows. <br>";
 	outputMessage += "-- Press ' b ' - To toggle textures. <br>";
@@ -582,11 +595,6 @@ function draw_cube(){
 	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
 	gl.enableVertexAttribArray( vNormal);
 
-	// if (useReflection || useRefraction){
-	// 	gl.activeTexture(gl.TEXTURE1);
-	// 	gl.uniform1i(gl.getUniformLocation(program, "textureMap"), 0);		
-	// 	gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMap);
-	// }
 	gl.drawArrays( gl.TRIANGLES, 0, theCube.length);
 
 	//delete the buffer for memory management
@@ -649,12 +657,6 @@ function draw_sphere(){
  	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vPosition);
 
-	
-	// if (useReflection || useRefraction){
-	// 	gl.activeTexture(gl.TEXTURE1);
-	// 	gl.uniform1i(gl.getUniformLocation(program, "texMap"), 0);
-	// }
-
 	gl.drawArrays(gl.TRIANGLES, 0, theSphere.length);
 	gl.deleteBuffer(vBuffer);
 	gl.deleteBuffer(nBuffer);
@@ -676,11 +678,6 @@ function draw_lines(){
 					vec4( -treeDisplacementX-0.2, -1.5, 0, 1),vec4( treeDisplacementX+0.2, -1.5, 0, 1),		//horzontal line
 					vec4( -treeDisplacementX, -1.5, 0, 1),vec4( -treeDisplacementX, -2.5, 0, 1),	//right verticle line
 					vec4( treeDisplacementX, -1.5, 0, 1),vec4( treeDisplacementX, -2.5, 0, 1)];	//left verticle line
-
-	var connectionLinesColorsArray = [vec4( 1, 1, 1, 1),vec4( 1, 1, 1, 1),		//verticle line
-		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//horzontal line
-		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1),				//right verticle line
-		vec4(  1, 1, 1, 1),vec4( 1, 1, 1, 1)];				//left verticle line
 	
 	var pBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
@@ -704,6 +701,7 @@ function draw_lines(){
 }
 
 function cube(){
+	// Create a cube and pushes vertices to the lighting array.
 	var verts = [];
 	verts = verts.concat(quad( 1, 0, 3, 2 ));
 	verts = verts.concat(quad( 2, 3, 7, 6 ));
@@ -914,6 +912,7 @@ function calculateNumberObjects(numObjects){
 }
 
 function generateMaterialLighting(){
+
 	materialAmbientList = [];
 	materialDiffuseList = [];
 	materialSpecularList = [];
@@ -938,16 +937,6 @@ function modelRotations(direction){
 	}
 }
 
-function setSpotlightAngle(dPhi){
-	//set min and max thresholds for the spotlight angle
-	phi +=dPhi;
-	if (phi%100==1){
-		phi = 0.999;
-	}else if (phi%0.944==0){
-		phi = 0.945;
-	}
-}
-
 function drawPlane(color,type){
 
 	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
@@ -955,6 +944,7 @@ function drawPlane(color,type){
 	gl.uniform1f(gl.getUniformLocation(program, "useVertexTexture"), true);
 	gl.uniform1f(gl.getUniformLocation(program, "useReflection"), false);
 	gl.uniform1f(gl.getUniformLocation(program, "useRefraction"), false);
+	
 	var cColor = [];
 	for(i = 0; i<thePlane.length;i++){
 		cColor.push(color);
@@ -977,16 +967,15 @@ function drawPlane(color,type){
 	gl.enableVertexAttribArray( vNormal)
 
 	gl.activeTexture(gl.TEXTURE0);
-	if(type == 'floor'){
-		gl.uniform1i(gl.getUniformLocation(program, "texture0"), textures[0]);		
+
+	if(type == 'floor'){	
 		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
 	}else if (type == 'wall'){
-		gl.uniform1i(gl.getUniformLocation(program, "texture0"), textures[1]);
 		gl.bindTexture(gl.TEXTURE_2D, textures[1]);
 	}
 	
 	var tBuffer = gl.createBuffer();
-    gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer );
+    gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
 	gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW );
 
     var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
@@ -1001,29 +990,26 @@ function drawPlane(color,type){
 }
 
 function plane(){
+	// Create the plane using 4 points. Push the texture coordinates to the texCoordsArray
+	//	and oversample the texture to create a tiling effect. 
 	var verts = [];
 	verts = verts.concat(quad(  4, 5, 6, 7 ));
-	//compute normals
-	var i = 0;
-	while(i<verts.length){
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-		flatShadingNormalsArrayCube.push(vec4(verts[i][0],verts[i][1],verts[i][2],0));
-
-		var vc  = normal_newell_method([verts[i],verts[i+1],verts[i+2],verts[i]]);
-		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
-		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
-		gouraudLightingNormalsArrayCube.push(vec4( vc[0], vc[1], vc[2], 0));
-		i+=3;
-	}
 	i = 0;
-	while(i<theSphere.length){
+
+	while(i<6){
 		texCoordsArray.push(-3,  4,);
 		texCoordsArray.push(-3, -1);
 		texCoordsArray.push( 2, -1);
 		texCoordsArray.push(-3,  4);
 		texCoordsArray.push( 2, -1,);
 		texCoordsArray.push( 2,  4,);
+
+		// texCoordsArray.push(0, 1);
+		// texCoordsArray.push(0, 0);
+		// texCoordsArray.push(1, 0);
+		// texCoordsArray.push(0, 1);
+		// texCoordsArray.push(1, 0);
+		// texCoordsArray.push(1, 1,);
 		i+=6;
 	}
 
@@ -1031,39 +1017,38 @@ function plane(){
 }
 
 function draw_background(){
+	// Draws the background using the plane and hierachy model. 
+
 	//draw the floor
 	stack.push(mvMatrix);
 		mvMatrix = mult(mvMatrix, rotateX(90));
 		mvMatrix = mult(mvMatrix, translate(0, 0, 30));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), 
-			scalem(planeScale,planeScale,planeScale));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
 		drawPlane(vec4(0.5,0.5,0.5,1),'floor');
 	mvMatrix = stack.pop();
 
-	// // draw the wall on the left
+	// draw the wall on the left
 	stack.push(mvMatrix);
 		mvMatrix = mult(mvMatrix, rotateY(90));
-		mvMatrix = mult(mvMatrix, translate(0, 0, 50));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), 
-			scalem(planeScale,planeScale,planeScale));
+		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
 		drawPlane(vec4(0,0,0.75,1),'wall');
 	mvMatrix = stack.pop();
 
-	// draw the wall in the middle
+	//draw the wall in the middle
 	stack.push(mvMatrix);
-		mvMatrix = mult(mvMatrix, translate(0, 0, 50));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), 
-			scalem(planeScale,planeScale,planeScale));
+		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
 		drawPlane(vec4(0,0,0.75,1),'wall');
 	mvMatrix = stack.pop();
 
-	// //draw the wall on the left
+	//draw the wall on the left
 	stack.push(mvMatrix);
 		mvMatrix = mult(mvMatrix, rotateY(-90));
-		mvMatrix = mult(mvMatrix, translate(0, 0, 50));
+		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), 
 			scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));

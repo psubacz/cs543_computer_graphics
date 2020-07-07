@@ -59,10 +59,10 @@
 				vec4 ambient = ambientProduct;
 
 				//Diffuse light
-				vec4 diffuse =  dot(L, N) * diffuseProduct; //vec4(0,0,0,0); 
+				vec4 diffuse =  dot(L, N) * diffuseProduct;
 
 				//Specular light
-				vec4 specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;// vec4(0,0,0,0);
+				vec4 specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
 
 				//light direction
 				vec3 lightDir = normalize(vec3(-0, -0, -4));
@@ -101,11 +101,11 @@
 			}else{
 				gl_FragColor = fColor;	// Point color
 				if (useRefraction == true && useReflection == true){
-					gl_FragColor += textureCube(textureMap, refr) + textureCube(textureMap, refl);
+					gl_FragColor *= textureCube(textureMap, refr) + textureCube(textureMap, refl);
 				}else if (useRefraction == true){
-					gl_FragColor += textureCube(textureMap, refr);
+					gl_FragColor *= textureCube(textureMap, refr);
 				}else if ( useReflection == true){
-					gl_FragColor += textureCube(textureMap, refl);
+					gl_FragColor *= textureCube(textureMap, refl);
 				}
 			}
 		} 

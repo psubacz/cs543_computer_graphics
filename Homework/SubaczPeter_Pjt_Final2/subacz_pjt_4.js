@@ -9,24 +9,28 @@
  *   rotates around the y axis and sub tier models rotate counter clockwise. The cubes and spheres 
  * 	 are generated and randomly assigned material diffuse, ambient, and specular coefficients.
  * 
+ * 	Back face culling is enabled as well as depth testing.
  * 
- * Back face culling is enabled.
+ * 	A cube map has been implemented to show reflections and refractions effects on drawn objects
+ * 	 within the model.
+ * 
+ * 	Planes representing the floor and wall have been implemented and draw with flat colors or 
+ * 	 textures depending on the toggle of textures. The walls can be rendered in blue or the 
+ * 	 a brick texture. The floor is rendered in gray or a grass texture. 
  * 
  * Interactive features:
- *		Press ' p ' - Increase spotlight cut off angle (increase cone angle).
+ *		Press ' A ' - To toggle shadows.
+ *		Press ' B ' - To toggle textures.
+ * 		Press ' C ' - To toggle refections.
+ * 		Press ' D ' - To toggle refractions.
+ * 		Press ' m ' - The scene is shaded using Gouraud lighting
+ * 		Press ' M ' - The scene is shaded using flat shading.
+ * 		Press ' n ' - Change the color properties.
+ * 		Press ' p ' - Increase spotlight cut off angle (increase cone angle).
  *		Press ' P ' - Decrease spotlight cut off angle (decrease cone angle).
- *		Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading). 
- *		Press ' M ' - The scene is shaded using flat shading.
-  *		Press ' n ' - Swap between present colors and randomly generated colors. 
- * 		Press ' w ' to reset spotlight angle.
+ * 		Press ' z ' - To toggle animation.
+ * 		Press ' W ' or ' w ' to reset spotlight angle.
  * 
- * 
- * 
- * 
- * 
- * 
- * TODO - 
- * 		Refactor textures to tile instead of stretch. Need to map texture cordinates to pixel
  */
 
 var gl;						// webgl
@@ -164,7 +168,7 @@ function main(){
 	projectionMatrix = perspective(fovy, aspect, 0.001, 60);
 	gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix));
 
-	eye = vec3(0, 10, -25);
+	eye = vec3(0, 10, 20);
 	at = vec3(0.0, 6.0, 0.0);
 	up = vec3(0.0, 1.0, 0.0);
 	mvMatrix = lookAt(eye, at , up);
@@ -177,7 +181,7 @@ function main(){
 	//set shadows
 	light = eye;
 	m[3][3] = 0;
-	m[3][2] = 1/light[2];
+	m[3][2] = -1/light[2];
 	
 	for(var i =0;i<theCube.length;i++){
 		shadowCubeColorArray.push(shadowColor);
@@ -195,12 +199,13 @@ function main(){
 
 function render(){
 	gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 		//clear screen
+	gl.uniform1f(gl.getUniformLocation(program, "phi"), phi);	//set spotlight angle
 	update_state_output()
 	stack.push(mvMatrix);
 		if(imagesToLoad == 0 && texturesLoaded == false){	// if all the files are downloaded,
 			configureTexture(images)						// configure the images
 			texturesLoaded = true;
-			viewTextures = true;
+			// viewTextures = true;
 		}
 		draw_background(); 			//draw floor and wall planes
 		index = 0;
@@ -225,9 +230,12 @@ function draw_shadows(type){
 		shadowMatrix = mult(shadowMatrix,translate(-light[0], -light[1], -light[2]));
 		mvMatrix = mult(shadowMatrix,mvMatrix);
 		//translate to the wall and adjusted for z displacement
-		// mvMatrix[2][3] =0
-		// mvMatrix = mult(translate(0, 0, -20+(mvMatrix[2][3]-20)),mvMatrix)
-		console.log(mvMatrix[2][3])
+		mvMatrix[2][3] -=mvMatrix[2][3]
+		if (stack.length<3){
+			mvMatrix = mult(translate(Math.sin(deg2rad(beta)), 0, -37),mvMatrix)
+		}else{
+			mvMatrix = mult(translate(0, 0, -37),mvMatrix)
+		}
 		
 		if(type == "sphere"){
 			gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(mvMatrix));
@@ -387,6 +395,38 @@ function process_keypress(theKey){
 	var outputMessage = '';
 	//on key presses, do change the colors or modes
 	switch (theKey) {
+		case 'A':// toggle shadows on and off
+			if (useShadows == false){
+				useShadows = true;
+			}else{
+				useShadows = false;
+			}
+			break;	
+
+		case 'B':// toggle textures on and off 		
+			if (viewTextures == false){
+				viewTextures = true;
+			}else{
+				viewTextures = false;
+			}
+			break;
+
+		case 'C':// toggle reflections on and off 
+			if (useReflection == false){
+				useReflection = true;
+			}else{
+				useReflection = false;
+			}
+			break;
+		
+		case 'D':// toggle refractions on and off 
+			if (useRefraction == false){
+				useRefraction = true;
+			}else{
+				useRefraction = false;
+			}
+			break;
+
 		case 'm':
 			//Gouraud lighting 
 			if (gouraudLighting == false){
@@ -407,27 +447,12 @@ function process_keypress(theKey){
 				gouraudLighting = true;
 			}
 			break;
-		case 'B':
-		case 'b':
-			// toggle textures on and off 
-			if (viewTextures == false){
-				viewTextures = true;
-			}else{
-				viewTextures = false;
-			}
-			break;
-		case 'A':
-		case 'a':
-			// toggle shadows on and off
-			if (useShadows == false){
-				useShadows = true;
-			}else{
-				useShadows = false;
-			}
-			break;			
 		case 'n':
 			generateMaterialLighting();
 			break;
+
+		
+
 		case 'w':
 			animation = true;
 			gouraudLighting = true;
@@ -438,24 +463,8 @@ function process_keypress(theKey){
 			useRefraction = false;
 			beta =0;
 			break;
-		case 'C':
-		case 'c':
-			// toggle reflections on and off 
-			if (useReflection == false){
-				useReflection = true;
-			}else{
-				useReflection = false;
-			}
-			break;
-		case 'D':
-		case 'd':
-			// toggle refractions on and off 
-			if (useRefraction == false){
-				useRefraction = true;
-			}else{
-				useRefraction = false;
-			}
-			break;
+
+
 		case 'z':
 			if (animation == false){
 				animation = true;
@@ -464,23 +473,30 @@ function process_keypress(theKey){
 				animation = false;
 			}
 			render();
+			break;		
+		case 'p':
+			setSpotlightAngle(0.001);	//increasing angle by +0.01
+			break;
+		case 'P':
+			setSpotlightAngle(-0.001);	//decreasing angle by -0.01
 			break;
 		default:
-			//do nothing		
+		//do nothing		
 	}
-
 
 	outputMessage = 'Current keypress actions are: <br>';
 	outputMessage += '- Interaction: <br>';
+	outputMessage += "-- Press ' A ' - To toggle shadows. <br>";
+	outputMessage += "-- Press ' B ' - To toggle textures. <br>";
+	outputMessage += "-- Press ' C ' - To toggle refections. <br>";
+	outputMessage += "-- Press ' D ' - To toggle refractions. <br>";
 	outputMessage += "-- Press ' m ' - The scene is shaded using Gouraud lighting (smooth shading).<br>";
 	outputMessage += "-- Press ' M ' - The scene is shaded using flat shading. <br>";
 	outputMessage += "-- Press ' n ' - Change the color properties. <br>";
-	outputMessage += "-- Press ' c ' - To toggle refections. <br>";
-	outputMessage += "-- Press ' d ' - To toggle refractions. <br>";
+	outputMessage += "-- Press ' p ' - Increase spotlight cut off angle (increase cone angle).<br>";
+	outputMessage += "-- Press ' P ' - Decrease spotlight cut off angle (decrease cone angle) .<br>";
+	outputMessage += '- Pause <br>';
 	outputMessage += "-- Press ' z ' - To toggle animation. <br>";
-	outputMessage += "-- Press ' a ' - To toggle shadows. <br>";
-	outputMessage += "-- Press ' b ' - To toggle textures. <br>";
-
 	outputMessage += '- Reset <br>';
 	outputMessage += "-- Press ' W ' or ' w ' to reset spotlight angle. <br>";
 	document.getElementById('pageContent').innerHTML = outputMessage;
@@ -537,7 +553,7 @@ function update_state_output(){
 	}else{
 		msg += " Refraction: Off<br>";
 	}
-	// msg += " Spotlight Angle:"+phi+"<br>";
+	msg += " Spotlight Angle:"+phi+"<br>";
 	msg += " Model Angle:"+beta+"<br>";
 	document.getElementById("pageMode").innerHTML = msg;
 }
@@ -848,7 +864,7 @@ function computeHierarchyModel(){
 		3. Repeat steps 1 & 2 for each level.
 	*/
 	stack.push(mvMatrix);
-		mvMatrix = mult(mvMatrix, translate(0, 10, -5));
+		mvMatrix = mult(mvMatrix, translate(0, 12, -5));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));	// 
 		draw_sphere();	// draw the root sphere
 
@@ -1003,13 +1019,6 @@ function plane(){
 		texCoordsArray.push(-3,  4);
 		texCoordsArray.push( 2, -1,);
 		texCoordsArray.push( 2,  4,);
-
-		// texCoordsArray.push(0, 1);
-		// texCoordsArray.push(0, 0);
-		// texCoordsArray.push(1, 0);
-		// texCoordsArray.push(0, 1);
-		// texCoordsArray.push(1, 0);
-		// texCoordsArray.push(1, 1,);
 		i+=6;
 	}
 
@@ -1037,10 +1046,19 @@ function draw_background(){
 		drawPlane(vec4(0,0,0.75,1),'wall');
 	mvMatrix = stack.pop();
 
-	//draw the wall in the middle
+	//draw the wall in the back
 	stack.push(mvMatrix);
 		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
+		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
+		drawPlane(vec4(0,0,0.75,1),'wall');
+	mvMatrix = stack.pop();
+
+	//draw the wall in the front front
+	stack.push(mvMatrix);
+		mvMatrix = mult(mvMatrix, rotateX(180));
+		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale+2));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
 		drawPlane(vec4(0,0,0.75,1),'wall');
 	mvMatrix = stack.pop();
@@ -1054,4 +1072,14 @@ function draw_background(){
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
 		drawPlane(vec4(0,0,0.75,1),'wall');
 	mvMatrix = stack.pop();	
+}
+
+function setSpotlightAngle(dPhi){
+	//set min and max thresholds for the spotlight angle
+	phi +=dPhi;
+	if (phi%100==1){
+		phi = 0.999;
+	}else if (phi%0.944==0){
+		phi = 0.945;
+	}
 }

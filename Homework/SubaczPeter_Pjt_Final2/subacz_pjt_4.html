@@ -50,25 +50,31 @@
 				refl = reflect(pos, N);
 
 				//Environment map refraction
-				refr = refract(pos, N, 0.80);
+				refr = refract(pos, N, 0.30);
 
 				//Reflection vector
 				vec3 R = (2.0 * dot(L, N) * N) - L;
-
+				
 				//Ambient light
 				vec4 ambient = ambientProduct;
 
 				//Diffuse light
-				vec4 diffuse =  dot(L, N) * diffuseProduct;
-
+				vec4 diffuse = vec4(0,0,0,0); 
+	
 				//Specular light
-				vec4 specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
-
+				vec4 specular = vec4(0,0,0,0);
+	
 				//light direction
 				vec3 lightDir = normalize(vec3(-0, -0, -4));
-
+	
+				if(dot(L, -lightDir) > phi)
+				{
+					diffuse = dot(L, N) * diffuseProduct;
+					specular = pow(max(dot(V, R), 0.0), shininess) * specularProduct;
+				}
 				fColor = ambient + diffuse + specular;
-			fColor.a = 1.0;
+				fColor.a = 1.0;
+
 			}else{
 				fColor = vNormal;
 			}

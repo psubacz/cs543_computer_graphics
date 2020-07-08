@@ -1043,7 +1043,7 @@ function draw_background(){
 		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
-		drawPlane(vec4(0,0,0.75,1),'wall');
+		drawPlane('wall');
 	mvMatrix = stack.pop();
 
 	//draw the wall in the back
@@ -1051,7 +1051,7 @@ function draw_background(){
 		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
-		drawPlane(vec4(0,0,0.75,1),'wall');
+		drawPlane('wall');
 	mvMatrix = stack.pop();
 
 	//draw the wall in the front front
@@ -1060,7 +1060,7 @@ function draw_background(){
 		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale+2));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
-		drawPlane(vec4(0,0,0.75,1),'wall');
+		drawPlane('wall');
 	mvMatrix = stack.pop();
 
 	//draw the wall on the left
@@ -1070,7 +1070,7 @@ function draw_background(){
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), 
 			scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
-		drawPlane(vec4(0,0,0.75,1),'wall');
+		drawPlane('wall');
 	mvMatrix = stack.pop();	
 }
 

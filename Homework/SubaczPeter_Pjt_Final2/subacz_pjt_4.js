@@ -192,7 +192,7 @@ function main(){
 	for(var i = 0; i<8;i++){
 		shadowLinesColorArray.push(shadowColor);
 	}
-
+	createATexture();
 	process_keypress('m');
 	render();
 }
@@ -287,6 +287,35 @@ function draw_shadows(type){
 
 function deg2rad(deg){
 	return deg*(Math.PI/180);
+}
+
+function createATexture() {
+
+	//Initialize floor gray texture
+	var texture = gl.createTexture();
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, texture);
+
+	//Create a 2x2 texture
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+		new Uint8Array([128,128, 128, 255,128,128, 128, 255,128,128, 128, 255, 128,128, 128, 255]));
+
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	textures.push(texture); 
+
+    //Initialize wall blue texture
+	var texture = gl.createTexture();
+	gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    //Create a 2x2 texture
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255]));
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	textures.push(texture); 
 }
 
 function configureTexture(images) {
@@ -395,6 +424,7 @@ function process_keypress(theKey){
 	var outputMessage = '';
 	//on key presses, do change the colors or modes
 	switch (theKey) {
+		case 'a':
 		case 'A':// toggle shadows on and off
 			if (useShadows == false){
 				useShadows = true;
@@ -402,7 +432,7 @@ function process_keypress(theKey){
 				useShadows = false;
 			}
 			break;	
-
+		case 'b':
 		case 'B':// toggle textures on and off 		
 			if (viewTextures == false){
 				viewTextures = true;
@@ -410,7 +440,7 @@ function process_keypress(theKey){
 				viewTextures = false;
 			}
 			break;
-
+		case 'c':
 		case 'C':// toggle reflections on and off 
 			if (useReflection == false){
 				useReflection = true;
@@ -418,7 +448,7 @@ function process_keypress(theKey){
 				useReflection = false;
 			}
 			break;
-		
+		case 'd':
 		case 'D':// toggle refractions on and off 
 			if (useRefraction == false){
 				useRefraction = true;
@@ -451,8 +481,6 @@ function process_keypress(theKey){
 			generateMaterialLighting();
 			break;
 
-		
-
 		case 'w':
 			animation = true;
 			gouraudLighting = true;
@@ -463,7 +491,6 @@ function process_keypress(theKey){
 			useRefraction = false;
 			beta =0;
 			break;
-
 
 		case 'z':
 			if (animation == false){
@@ -928,7 +955,6 @@ function calculateNumberObjects(numObjects){
 }
 
 function generateMaterialLighting(){
-
 	materialAmbientList = [];
 	materialDiffuseList = [];
 	materialSpecularList = [];
@@ -953,18 +979,13 @@ function modelRotations(direction){
 	}
 }
 
-function drawPlane(color,type){
+function drawPlane(type){
 
 	gl.uniform1i(gl.getUniformLocation(program, "useLighting"), false);
-	gl.uniform1f(gl.getUniformLocation(program, "useTexture"), viewTextures);
+	gl.uniform1f(gl.getUniformLocation(program, "useTexture"), true);
 	gl.uniform1f(gl.getUniformLocation(program, "useVertexTexture"), true);
 	gl.uniform1f(gl.getUniformLocation(program, "useReflection"), false);
 	gl.uniform1f(gl.getUniformLocation(program, "useRefraction"), false);
-	
-	var cColor = [];
-	for(i = 0; i<thePlane.length;i++){
-		cColor.push(color);
-	};
 	
 	var pBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
@@ -973,10 +994,6 @@ function drawPlane(color,type){
 	var vPosition = gl.getAttribLocation(program,  "vPosition");
 	gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(vPosition);		//Turns the attribute on
-	
-	var nBuffer = gl.createBuffer();
-	gl.bindBuffer( gl.ARRAY_BUFFER, nBuffer);
-	gl.bufferData( gl.ARRAY_BUFFER, flatten(cColor), gl.STATIC_DRAW );
 
 	var vNormal = gl.getAttribLocation( program, "vNormal" );
 	gl.vertexAttribPointer( vNormal, 4, gl.FLOAT, false, 0, 0 );
@@ -984,10 +1001,19 @@ function drawPlane(color,type){
 
 	gl.activeTexture(gl.TEXTURE0);
 
-	if(type == 'floor'){	
-		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+	if(type == 'floor'){
+		if (viewTextures ==true){
+			gl.bindTexture(gl.TEXTURE_2D, textures[2]);
+		}else{
+			gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+		}
+		
 	}else if (type == 'wall'){
-		gl.bindTexture(gl.TEXTURE_2D, textures[1]);
+		if (viewTextures ==true){
+			gl.bindTexture(gl.TEXTURE_2D, textures[3]);
+		}else{
+			gl.bindTexture(gl.TEXTURE_2D, textures[1]);
+		}
 	}
 	
 	var tBuffer = gl.createBuffer();
@@ -1000,7 +1026,6 @@ function drawPlane(color,type){
 
 	gl.drawArrays(gl.TRIANGLES, 0, thePlane.length);
 	gl.deleteBuffer(pBuffer);
-	gl.deleteBuffer(nBuffer);
 	gl.disableVertexAttribArray( vTexCoord );
 	gl.deleteBuffer(tBuffer);
 }
@@ -1034,7 +1059,7 @@ function draw_background(){
 		mvMatrix = mult(mvMatrix, translate(0, 0, 30));
 		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
-		drawPlane(vec4(0.5,0.5,0.5,1),'floor');
+		drawPlane('floor');
 	mvMatrix = stack.pop();
 
 	// draw the wall on the left
@@ -1067,8 +1092,7 @@ function draw_background(){
 	stack.push(mvMatrix);
 		mvMatrix = mult(mvMatrix, rotateY(-90));
 		mvMatrix = mult(mvMatrix, translate(0, 0, wallDisplacementZ));
-		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), 
-			scalem(planeScale,planeScale,planeScale));
+		mvMatrix = mult(mult(mvMatrix,translate(0, 0, 0)), scalem(planeScale,planeScale,planeScale));
 		gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(mvMatrix));
 		drawPlane('wall');
 	mvMatrix = stack.pop();	

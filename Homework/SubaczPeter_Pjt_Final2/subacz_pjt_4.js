@@ -210,7 +210,6 @@ function render(){
 		draw_background(); 			//draw floor and wall planes
 		index = 0;
 		computeHierarchyModel();	//compute hierachy model
-		// draw_background(); 			//draw floor and wall planes
 	mvMatrix = stack.pop();
 	if (animation){
 		id = requestAnimationFrame(render);

@@ -70,29 +70,32 @@
             vec3 color = vec3(0.0, 0.0, 0.0);
         
             // Create spheres
-            spheres[0].center = vec3(-0.3, 0.031, 0.0);
+            spheres[0].center = vec3(-0.3, 0.0, 0.0);
             spheres[0].radius = 0.3;
             spheres[0].color = vec3(1.0, 0.0, 0.0);
             spheres[0].isSpecular = true;
+            spheres[0].isReflective = true; 
 
-            spheres[1].center = vec3(0.3, 0.0, 0.0);
+            spheres[1].center = vec3(0.35, 0.0, -0.1);
             spheres[1].radius = 0.3;
             spheres[1].color = vec3(1, 1, 0.0);
             spheres[1].isSpecular = false;
+            spheres[1].isReflective = false; 
 
             // Create reflective plane
-            planes[0].normal = vec3(0.0, -1.0, -0.001);
-            planes[0].origin = vec3(0.0, 0.5, 1.0);
+            planes[0].normal = vec3(0.0, -1.0, -0.005);
+            planes[0].origin = vec3(0.0, 0.650, 2);
             planes[0].color = vec3(0.0, 0.0, 1.0);
             planes[0].isSpecular = false;
+            planes[0].isReflective = true;
     
             // Create ray
             rays[0].origin = vec3(0.0, 0.0, focalLength);
             rays[0].direction = normalize(vec3(x, y, -focalLength));
         
             // Create Light source
-            light[0].position = vec3(-1, 1, 0.0);
-            light[0].ambience = 0.3;
+            light[0].position = vec3(-1, 1, 0.5);
+            light[0].ambience = 0.5;
         }
 
         float checkShadows(float T, Sphere sphere, Ray ray,Light light){
@@ -181,7 +184,8 @@
             float t = 0.0;
             int sphereIndex = 0;
             bool inShadows = false;
-            bool useSpecular = sphereToShow.isSpecular;
+            bool useSpecular = false;
+            bool useReflective = false;//
 
             //check sphere collision
             for (int i=0; i < 2; i++) {
@@ -192,6 +196,20 @@
                     objectCenter = spheres[i].center;
                     objectColor = spheres[i].color;
                     useSpecular = spheres[i].isSpecular;
+                    useReflective = spheres[i].isReflective;
+                }
+            }
+
+            //check plane collision
+            for(int i=0; i < 1; i++){
+                t = checkIntersectPlane(planes[i], ray);
+                if (t > 0.0 && t < minT) {
+                    minT = t;
+                    sphereIndex = i;
+                    objectCenter = planes[i].origin;
+                    objectColor = planes[i].color;
+                    useSpecular = planes[i].isSpecular;
+                    useReflective = planes[i].isReflective;
                 }
             }
 
@@ -206,18 +224,6 @@
                     }else{
                         inShadows=false;
                     }
-                }
-            }
-
-            //check plane collision
-            for(int i=0; i < 1; i++){
-                t = checkIntersectPlane(planes[i], ray);
-                if (t > 0.0 && t < minT) {
-                    minT = t;
-                    sphereIndex = i;
-                    objectCenter = planes[i].origin;
-                    objectColor = planes[i].color;
-                    useSpecular = planes[i].isSpecular;
                 }
             }
 
@@ -240,16 +246,18 @@
                 }else{
                     // compute ambient
                     color = objectColor * (ambience + ((1.0 - ambience) * max(0.0, dot(surfaceNormal, lightSource))));
-                    //Reflected ray
                     vec3 reflection = 2.0 * dot(-ray.direction, surfaceNormal) * surfaceNormal + ray.direction;
+                    if (useReflective==true){
+                    //Reflected ray
+                    
                     reflectionRay.origin = surfacePoint + 0.0001 * surfaceNormal;
                     reflectionRay.direction = reflection;
                     rayTracer.reflectedRay = reflectionRay;
-
+                    }
                     if (useSpecular==true){
                         // compute specular
                         specularProduct =  vec3(0.1, 0.1,0.1);
-                        shininess = 6.0;
+                        shininess = 4.0;
                         color = color + vec3(1,1,1)*pow(max(dot(lightSource, reflection), 0.0), shininess) * specularProduct;
                     }
                 }

@@ -12,9 +12,6 @@
         vPosition = aPosition;
     }
     </script>
-
-
-
     <script id="fshader0" type="x-shader/x-fragment">
         precision mediump float;
         varying vec3 vPosition;
@@ -95,7 +92,7 @@
         
             // Create Light source
             light[0].position = vec3(-1, 1, 0.5);
-            light[0].ambience = 0.5;
+            light[0].ambience = 0.865;
         }
 
         float checkShadows(float T, Sphere sphere, Ray ray,Light light){
@@ -182,10 +179,12 @@
             float shininess = 0.8;
             float minT = 10000000.0;
             float t = 0.0;
-            int sphereIndex = 0;
+            int sphereIndex = -1;
             bool inShadows = false;
             bool useSpecular = false;
             bool useReflective = false;//
+            bool planeShadow = false;
+            bool sphereShadow = false;
 
             //check sphere collision
             for (int i=0; i < 2; i++) {
@@ -197,6 +196,7 @@
                     objectColor = spheres[i].color;
                     useSpecular = spheres[i].isSpecular;
                     useReflective = spheres[i].isReflective;
+                    sphereShadow = true;
                 }
             }
 
@@ -210,64 +210,67 @@
                     objectColor = planes[i].color;
                     useSpecular = planes[i].isSpecular;
                     useReflective = planes[i].isReflective;
+                    planeShadow = true;
                 }
             }
+            vec3 cameraSource = ray.origin;
+            vec3 cameraDirection = ray.direction;
+            vec3 lightSource = light.position;
+            float ambience = light.ambience;
+            float specular = light.specular;
+            float diffuse =  light.diffuse;
 
-            float minZ = 100000.0;
+            Ray reflectionRay;
+
+            float minZ = 1000000000.0;
             for (int i=0; i < 2; i++){
-                if (i == sphereIndex){
-                    //do nothing, do not check against itself
-                }else{
-                    float z = checkShadows(minT, spheres[i], ray, light);
-                    if (z > 0.0 && z < minZ) {
-                        inShadows=true;
-                    }else{
-                        inShadows=false;
-                    }
+                float z = checkShadows(minT, spheres[i], ray, light);
+                if (z > 0.0 && z < minZ) {
+                    inShadows=true;
+                    //vec3 interestionPoint = cameraSource + z * cameraDirection;
+                    //vec3 interestionDirection = normalize(interestionPoint-light.position);
+                    //vec3 surfacePoint = cameraSource + (z * cameraDirection);
+                    //vec3 surfaceNormal = normalize(surfacePoint - light.position);
+                    //objectColor =vec3(0,0,0);
+                    //color = objectColor;
+                    //compute diffuse
+                    //color = color + (diffuseProduct*dot(lightSource,normalize(surfacePoint - objectCenter)));
                 }
             }
 
             if(minT > 0.0 && minT < 10000000.0) {
-                vec3 cameraSource = ray.origin;
-                vec3 cameraDirection = ray.direction;
-                vec3 lightSource = light.position;
-                
-                float ambience = light.ambience;
-                float specular = light.specular;
-                float diffuse =  light.diffuse;
-
-                Ray reflectionRay;
-
+    
                 vec3 surfacePoint = cameraSource + (minT * cameraDirection);
                 vec3 surfaceNormal = normalize(surfacePoint - objectCenter);
-
-                if (inShadows == true){
-                    color = objectColor * ambience;
-                }else{
-                    // compute ambient
-                    color = objectColor * (ambience + ((1.0 - ambience) * max(0.0, dot(surfaceNormal, lightSource))));
-                    vec3 reflection = 2.0 * dot(-ray.direction, surfaceNormal) * surfaceNormal + ray.direction;
-                    if (useReflective==true){
+                // compute ambient
+                color = objectColor * (ambience + ((1.0 - ambience) * max(0.0, dot(surfaceNormal, lightSource))));
+                vec3 reflection = 2.0 * dot(-ray.direction, surfaceNormal) * surfaceNormal + ray.direction;
+                if (useReflective==true){
                     //Reflected ray
-                    
                     reflectionRay.origin = surfacePoint + 0.0001 * surfaceNormal;
                     reflectionRay.direction = reflection;
                     rayTracer.reflectedRay = reflectionRay;
-                    }
-                    if (useSpecular==true){
-                        // compute specular
-                        specularProduct =  vec3(0.1, 0.1,0.1);
-                        shininess = 4.0;
-                        color = color + vec3(1,1,1)*pow(max(dot(lightSource, reflection), 0.0), shininess) * specularProduct;
-                    }
+                }
+                if (useSpecular==true){
+                    // compute specular
+                    specularProduct =  vec3(0.2, 0.2,0.2);
+                    shininess = 9.0;
+                    color = color + vec3(1,1,1)*pow(max(dot(lightSource, reflection), 0.0), shininess) * specularProduct;
                 }
                 //compute diffuse
-                    color = color + (diffuseProduct*dot(lightSource,surfaceNormal));
-                rayTracer.color = color;
+                color = color + (diffuseProduct*dot(lightSource,surfaceNormal));
+                if (inShadows ==true){
+                    if (planeShadow==true){
+                        color = color + (diffuseProduct*dot(lightSource,surfaceNormal));
+                    }
+                    if(sphereShadow==true){
+                        color = objectColor * ambience;
+                    }
+                }
             }else{
                 color = vec3(0,0,0);
-                rayTracer.color = color;
             }
+            rayTracer.color = color;
             return rayTracer;
         }
 
@@ -278,6 +281,7 @@
             gl_FragColor = vec4(mainRay.color + reflectionRay0.color, 1.0);
         }
     </script>
+
     <script id="fshader1" type="x-shader/x-fragment">
         precision mediump float;
         varying vec3 vPosition;

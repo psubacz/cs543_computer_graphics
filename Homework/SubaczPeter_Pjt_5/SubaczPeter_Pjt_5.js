@@ -69,5 +69,5 @@ function main()
         console.log('Failed to get the rendering context for WebGL');
         return;
     }
-    configure_image_one()
+    configure_image_three()
 }
